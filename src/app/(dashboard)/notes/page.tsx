@@ -1,46 +1,40 @@
 "use client";
 
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { FileText, Search, Upload } from "lucide-react";
-import Link from "next/link";
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { FileUpload } from "@/components/file-upload";
 import { telegramService } from "@/lib/telegram";
 import { toast } from "sonner";
 import { SubjectSelector } from "@/components/subject-selector";
 import { channelStore } from "@/lib/store";
+import { FileList } from "@/components/file-list";
 
 export default function NotesPage() {
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [uploadType, setUploadType] = useState<'Lectures' | 'Assignments' | 'Study Materials'>('Lectures');
+  const [selectedChannelId, setSelectedChannelId] = useState<number | null>(null);
 
-  const notes = [
-    {
-      id: 1,
-      title: "Chapter 1: Introduction to Calculus",
-      subject: "Mathematics",
-      date: "2024-02-20",
-    },
-    {
-      id: 2,
-      title: "Data Structures and Algorithms",
-      subject: "Computer Science",
-      date: "2024-02-19",
-    },
-    // Add more notes
-  ];
-
-  // Helper function for consistent date formatting
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    });
+  const handleSubjectSelect = (subject: string) => {
+    setSelectedSubject(subject);
+    const channelId = channelStore.getChannelId(subject, uploadType);
+    console.log('Selected subject:', subject, 'Type:', uploadType, 'Channel ID:', channelId);
+    setSelectedChannelId(channelId);
   };
+
+  const handleTypeChange = (type: typeof uploadType) => {
+    setUploadType(type);
+    if (selectedSubject) {
+      const channelId = channelStore.getChannelId(selectedSubject, type);
+      console.log('Changed type:', type, 'Subject:', selectedSubject, 'Channel ID:', channelId);
+      setSelectedChannelId(channelId);
+    }
+  };
+
+  // Debug logging of channel store on mount
+  useEffect(() => {
+    console.log('Available subjects:', channelStore.getAllSubjects());
+    channelStore.logChannels();
+  }, []);
 
   const handleFileUpload = async (file: File) => {
     try {
@@ -50,6 +44,7 @@ export default function NotesPage() {
       }
 
       const channelId = channelStore.getChannelId(selectedSubject, uploadType);
+      console.log('Uploading to channel ID:', channelId);
       
       if (!channelId) {
         toast.error("Channel not found for selected subject");
@@ -59,10 +54,11 @@ export default function NotesPage() {
       await telegramService.uploadFile(channelId, file);
       toast.success("File uploaded successfully!");
       
-      // Refresh the notes list
-      // You'll need to implement this
-      refreshNotes();
+      // Force refresh of the FileList component by changing the key
+      setSelectedChannelId(null);
+      setTimeout(() => setSelectedChannelId(channelId), 100);
     } catch (error) {
+      console.error('Upload error:', error);
       toast.error(error instanceof Error ? error.message : "Failed to upload file");
     }
   };
@@ -76,17 +72,13 @@ export default function NotesPage() {
             View and manage all your notes
           </p>
         </div>
-        <Button>
-          <Upload className="mr-2 h-4 w-4" />
-          Upload Notes
-        </Button>
       </div>
 
       <div className="flex items-center gap-4">
-        <SubjectSelector onSelect={(subject) => setSelectedSubject(subject)} />
+        <SubjectSelector onSelect={handleSubjectSelect} />
         <select
           value={uploadType}
-          onChange={(e) => setUploadType(e.target.value as typeof uploadType)}
+          onChange={(e) => handleTypeChange(e.target.value as typeof uploadType)}
           className="border rounded-md p-2"
         >
           <option value="Lectures">Lectures</option>
@@ -96,37 +88,20 @@ export default function NotesPage() {
       </div>
 
       {selectedSubject && (
-        <FileUpload onUpload={handleFileUpload} />
-      )}
-
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search notes..." className="pl-8" />
-        </div>
-        <Button variant="outline">Filter</Button>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {notes.map((note) => (
-          <Link key={note.id} href={`/notes/${note.id}`}>
-            <Card className="hover:border-primary transition-colors cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  {note.title}
-                </CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-xs text-muted-foreground">
-                  <p>{note.subject}</p>
-                  <p>Updated {formatDate(note.date)}</p>
-                </div>
+        <div className="space-y-8">
+          <FileUpload onUpload={handleFileUpload} />
+          {selectedChannelId && (
+            <Card>
+              <CardContent className="p-6">
+                <FileList 
+                  key={selectedChannelId} 
+                  channelId={selectedChannelId} 
+                />
               </CardContent>
             </Card>
-          </Link>
-        ))}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 } 

@@ -12,7 +12,7 @@ interface FileUploadProps {
   maxSize?: number; // in bytes
 }
 
-export function FileUpload({ onUpload, accept = ".pdf,.doc,.docx", maxSize = 50 * 1024 * 1024 }: FileUploadProps) {
+export function FileUpload({ onUpload, accept = ".pdf,.doc,.docx,.txt,.rtf,.ppt,.pptx,.xls,.xlsx,.csv,.jpg,.jpeg,.png,.gif,.mp3,.mp4,.zip,.rar", maxSize = 50 * 1024 * 1024 }: FileUploadProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);

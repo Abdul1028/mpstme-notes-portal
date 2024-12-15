@@ -13,12 +13,11 @@ type SubjectChannel = {
 class ChannelStore {
   private static instance: ChannelStore;
   private channels: Map<string, SubjectChannel> = new Map();
-  private readonly STORAGE_KEY = 'mpstme-channels';
+  readonly STORAGE_KEY = 'mpstme-channels';
 
   private constructor() {
-    // Load channels from localStorage on initialization
     this.loadFromStorage();
-    console.log('ChannelStore initialized with channels:', this.getAllSubjects()); // Debug log
+    console.log('ChannelStore initialized with channels:', this.getAllSubjects());
   }
 
   static getInstance(): ChannelStore {
@@ -35,11 +34,32 @@ class ChannelStore {
       const stored = localStorage.getItem(this.STORAGE_KEY);
       if (stored) {
         const channels = JSON.parse(stored) as SubjectChannel[];
+        channels.forEach(channel => {
+          channel.mainChannelId = this.ensureNegativeId(channel.mainChannelId);
+          channel.subChannels.forEach(sc => {
+            sc.id = this.ensureNegativeId(sc.id);
+          });
+        });
         this.channels = new Map(channels.map(channel => [channel.subject, channel]));
       }
     } catch (error) {
       console.error('Error loading channels from storage:', error);
     }
+  }
+
+  private ensureNegativeId(id: number): number {
+    return -Math.abs(id);
+  }
+
+  private ensureConsistentIds(channel: SubjectChannel): SubjectChannel {
+    return {
+      ...channel,
+      mainChannelId: this.ensureNegativeId(channel.mainChannelId),
+      subChannels: channel.subChannels.map(sc => ({
+        ...sc,
+        id: this.ensureNegativeId(sc.id)
+      }))
+    };
   }
 
   private saveToStorage() {
@@ -54,31 +74,41 @@ class ChannelStore {
   }
 
   setChannels(channels: SubjectChannel[]) {
-    console.log('Setting channels:', channels); // Debug log
+    console.log('Setting channels:', channels);
     channels.forEach(channel => {
-      this.channels.set(channel.subject, channel);
+      const consistentChannel = this.ensureConsistentIds(channel);
+      this.channels.set(channel.subject, consistentChannel);
     });
     this.saveToStorage();
-    console.log('Channels after setting:', this.getAllSubjects()); // Debug log
+    console.log('Channels after setting:', this.getAllSubjects());
   }
 
   getChannelId(subject: string, type: 'Lectures' | 'Assignments' | 'Study Materials'): number | null {
     const channel = this.channels.get(subject);
-    if (!channel) return null;
+    if (!channel) {
+      console.log(`No channel found for subject: ${subject}`);
+      return null;
+    }
 
     const subChannel = channel.subChannels.find(sc => sc.name.includes(type));
-    return subChannel?.id || null;
+    if (!subChannel) {
+      console.log(`No subchannel found for type: ${type} in subject: ${subject}`);
+      return null;
+    }
+
+    return this.ensureNegativeId(subChannel.id);
   }
 
   getMainChannelId(subject: string): number | null {
-    return this.channels.get(subject)?.mainChannelId || null;
+    const channel = this.channels.get(subject);
+    if (!channel) return null;
+    return this.ensureNegativeId(channel.mainChannelId);
   }
 
   getAllSubjects(): string[] {
     return Array.from(this.channels.keys());
   }
 
-  // Debug method
   logChannels() {
     console.log('Current channels:', Array.from(this.channels.entries()));
   }
@@ -88,7 +118,7 @@ class ChannelStore {
     if (isClient) {
       localStorage.removeItem(this.STORAGE_KEY);
     }
-    console.log('Store cleared'); // Debug log
+    console.log('Store cleared');
   }
 }
 

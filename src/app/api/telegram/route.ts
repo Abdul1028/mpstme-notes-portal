@@ -20,11 +20,26 @@ async function getClient() {
   if (!client) {
     client = new TelegramClient(stringSession, Number(apiId), apiHash, {
       connectionRetries: 5,
+      useWSS: false,
+      maxConcurrentDownloads: 10
     });
+    await client.connect();
+    console.log('New Telegram client created and connected');
   }
 
   if (!client.connected) {
-    await client.connect();
+    try {
+      await client.connect();
+      console.log('Reconnected existing client');
+    } catch (error) {
+      console.error('Failed to reconnect, creating new client:', error);
+      client = new TelegramClient(stringSession, Number(apiId), apiHash, {
+        connectionRetries: 5,
+        useWSS: false,
+        maxConcurrentDownloads: 10
+      });
+      await client.connect();
+    }
   }
 
   return client;
@@ -98,28 +113,134 @@ export async function POST(req: Request) {
 
       case 'getFiles': {
         const { channelId } = data;
-        const filter = new Api.InputMessagesFilterDocument();
-        const messages = await client.getMessages(channelId, {
-          limit: 100,
-          filter
-        });
+        console.log('Getting files for channel ID:', channelId);
         
-        return NextResponse.json({
-          success: true,
-          files: messages.map(msg => {
-            const doc = msg.media && 'document' in msg.media ? msg.media.document : null;
-            const attrs = doc && 'attributes' in doc ? doc.attributes : [];
-            const fileNameAttr = attrs.find((attr: any) => attr.className === 'DocumentAttributeFilename');
+        try {
+          // Get all dialogs first
+          const dialogs = await client.getDialogs({
+            limit: 100
+          });
+          
+          console.log('Available dialogs:', dialogs.map(d => ({
+            id: d.id?.toString(),
+            title: d.title,
+            isChannel: d.isChannel,
+            className: d.entity?.className
+          })));
+
+          // Try to get the entity directly first
+          let entity;
+          try {
+            entity = await client.getEntity(channelId);
+            console.log('Found entity directly:', entity);
+          } catch (entityError) {
+            console.error('Failed to get entity directly:', entityError);
             
-            return {
-              id: msg.id,
-              fileName: fileNameAttr?.fileName || 'Unnamed file',
-              size: doc && 'size' in doc ? doc.size : 0,
-              date: msg.date,
-              mimeType: doc && 'mimeType' in doc ? doc.mimeType : undefined
-            };
-          })
-        });
+            // If direct entity fetch fails, try to find in dialogs
+            const channel = dialogs.find(d => {
+              if (!d.id) return false;
+              
+              const dialogId = typeof d.id === 'bigint' ? Number(d.id) : 
+                             typeof d.id === 'number' ? d.id : 
+                             Number(d.id.toString());
+              
+              // Handle both positive and negative versions of the ID
+              const targetId = Math.abs(Number(channelId));
+              const currentId = Math.abs(dialogId);
+              
+              const matches = currentId === targetId;
+              console.log('Comparing:', { dialogId, channelId, currentId, targetId, matches });
+              return matches;
+            });
+
+            if (!channel || !channel.entity) {
+              console.log('Channel not found in dialogs either');
+              throw new Error(`Channel not found with ID ${channelId}`);
+            }
+            
+            entity = channel.entity;
+          }
+
+          // Get messages with documents
+          const filter = new Api.InputMessagesFilterDocument();
+          console.log('Getting messages with filter...');
+          
+          try {
+            // Get messages using the entity
+            const messages = await client.getMessages(entity, {
+              limit: 100,
+              filter: filter
+            });
+
+            console.log('Found messages:', messages.length);
+            
+            const files = messages
+              .filter(msg => msg.media && 'document' in msg.media)
+              .map(msg => {
+                try {
+                  const media = msg.media;
+                  const document = media && 'document' in media ? media.document : null;
+                  
+                  if (!document) {
+                    console.log('No document found in message:', msg.id);
+                    return null;
+                  }
+
+                  // Get file name from document attributes
+                  let fileName = 'Unnamed file';
+                  let fileSize = 'Unknown size';
+                  
+                  if (document.attributes) {
+                    for (const attr of document.attributes) {
+                      if ('fileName' in attr) {
+                        fileName = attr.fileName;
+                      }
+                    }
+                  }
+
+                  // Get file size
+                  if ('size' in document) {
+                    fileSize = Math.round(document.size / 1024) + ' KB';
+                  }
+
+                  // Get mime type
+                  const mimeType = 'mimeType' in document ? document.mimeType : 'Unknown type';
+                  
+                  const uploadDate = new Date(msg.date * 1000).toLocaleString();
+                  
+                  const file = {
+                    id: msg.id,
+                    fileName,
+                    size: fileSize,
+                    uploadDate,
+                    mimeType,
+                    message: msg.message || ''
+                  };
+                  
+                  console.log('Processed file:', file);
+                  return file;
+                } catch (fileError) {
+                  console.error('Error processing file:', fileError);
+                  return null;
+                }
+              })
+              .filter(Boolean);
+
+            console.log('Returning files:', files.length);
+            
+            return NextResponse.json({
+              success: true,
+              channelTitle: entity.title || 'Unknown Channel',
+              files
+            });
+          } catch (error) {
+            console.error('Error getting messages:', error);
+            throw error;
+          }
+        } catch (error) {
+          console.error('Error in getFiles:', error);
+          throw error;
+        }
       }
 
       case 'downloadFile': {
