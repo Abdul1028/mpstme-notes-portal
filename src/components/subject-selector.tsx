@@ -35,9 +35,14 @@ export function SubjectSelector({ onSelect }: SubjectSelectorProps) {
   useEffect(() => {
     const loadSubjects = () => {
       try {
+        channelStore.loadFromStorage();
         const availableSubjects = channelStore.getAllSubjects();
         console.log('Loading subjects:', availableSubjects);
         setSubjects(availableSubjects || []);
+        
+        if (value && !availableSubjects.includes(value)) {
+          setValue("");
+        }
       } catch (error) {
         console.error('Error loading subjects:', error);
         setSubjects([]);
@@ -48,15 +53,18 @@ export function SubjectSelector({ onSelect }: SubjectSelectorProps) {
 
     loadSubjects();
 
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === channelStore['STORAGE_KEY']) {
-        loadSubjects();
-      }
+    const handleStorageChange = () => {
+      loadSubjects();
     };
 
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, [pathname]);
+    window.addEventListener('channelsUpdated', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('channelsUpdated', handleStorageChange);
+    };
+  }, [value]);
 
   const filteredSubjects = subjects.filter((subject) =>
     subject.toLowerCase().includes(search.toLowerCase())

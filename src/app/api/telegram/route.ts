@@ -5,6 +5,7 @@ import { Api } from "telegram/tl";
 import { NewMessage } from "telegram/events";
 import { InputPeerChannel, InputMessagesFilterDocument } from "telegram/tl/types";
 import BigInt from "big-integer";
+import { channelStore, type SubjectChannel } from "@/lib/store";
 
 const apiId = process.env.TELEGRAM_API_ID;
 const apiHash = process.env.TELEGRAM_API_HASH;
@@ -66,31 +67,43 @@ export async function POST(req: Request) {
         const mainChannel = await getOrCreateMainChannel(client);
         
         for (const subject of subjects) {
-          // Create subject channel
-          const subjectChannel = await createChannel(client, subject, `Notes for ${subject}`);
-          
-          // Create subfolders as discussion groups
-          const subFolders = ['Lectures', 'Assignments', 'Study Materials'];
-          const subChannels = [];
-          
-          for (const subFolder of subFolders) {
-            const subChannel = await createChannel(
-              client,
-              `${subject}-${subFolder}`,
-              `${subject} - ${subFolder}`
-            );
-            subChannels.push(subChannel);
+          try {
+            // Create subject channel
+            const subjectChannel = await createChannel(client, subject, `Notes for ${subject}`);
+            
+            // Create subfolders as discussion groups
+            const subFolders = ['Lectures', 'Assignments', 'Study Materials'];
+            const subChannels = [];
+            
+            for (const subFolder of subFolders) {
+              const subChannel = await createChannel(
+                client,
+                `${subject}-${subFolder}`,
+                `${subject} - ${subFolder}`
+              );
+              subChannels.push(subChannel);
+            }
+            
+            const channelData = {
+              subject,
+              mainChannelId: subjectChannel.id,
+              subChannels: subChannels.map(c => ({ 
+                name: c.title,
+                id: c.id,
+                inviteLink: c.inviteLink
+              }))
+            };
+
+            // Add to results array
+            results.push(channelData);
+
+            // Update the channel store
+            channelStore.addChannel(channelData);
+            
+          } catch (error) {
+            console.error(`Error creating channels for subject ${subject}:`, error);
+            throw error;
           }
-          
-          results.push({
-            subject,
-            mainChannelId: subjectChannel.id,
-            subChannels: subChannels.map(c => ({ 
-              name: c.title,
-              id: c.id,
-              inviteLink: c.inviteLink
-            }))
-          });
         }
 
         return NextResponse.json({ success: true, results });
