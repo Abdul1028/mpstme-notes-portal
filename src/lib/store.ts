@@ -1,6 +1,6 @@
 const isClient = typeof window !== 'undefined';
 
-export type SubjectChannel = {
+type SubjectChannel = {
   subject: string;
   mainChannelId: number;
   subChannels: {
@@ -17,15 +17,7 @@ class ChannelStore {
 
   private constructor() {
     this.loadFromStorage();
-    if (isClient) {
-      // Listen for storage changes from other tabs/windows
-      window.addEventListener('storage', (e) => {
-        if (e.key === this.STORAGE_KEY) {
-          this.loadFromStorage();
-          this.notifyUpdate();
-        }
-      });
-    }
+    console.log('ChannelStore initialized with channels:', this.getAllSubjects());
   }
 
   static getInstance(): ChannelStore {
@@ -41,21 +33,17 @@ class ChannelStore {
     try {
       const stored = localStorage.getItem(this.STORAGE_KEY);
       if (stored) {
-        console.log('Loading channels from storage:', stored);
         const channels = JSON.parse(stored) as SubjectChannel[];
-        this.channels.clear(); // Clear existing channels first
         channels.forEach(channel => {
-          const consistentChannel = this.ensureConsistentIds(channel);
-          this.channels.set(channel.subject, consistentChannel);
+          channel.mainChannelId = this.ensureNegativeId(channel.mainChannelId);
+          channel.subChannels.forEach(sc => {
+            sc.id = this.ensureNegativeId(sc.id);
+          });
         });
-        console.log('Loaded channels:', this.getAllSubjects());
-      } else {
-        console.log('No channels found in storage');
-        this.channels.clear();
+        this.channels = new Map(channels.map(channel => [channel.subject, channel]));
       }
     } catch (error) {
       console.error('Error loading channels from storage:', error);
-      this.channels.clear();
     }
   }
 
@@ -79,44 +67,20 @@ class ChannelStore {
     
     try {
       const channels = Array.from(this.channels.values());
-      console.log('Saving channels to storage:', channels);
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(channels));
     } catch (error) {
       console.error('Error saving channels to storage:', error);
     }
   }
 
-  private notifyUpdate() {
-    if (isClient) {
-      window.dispatchEvent(new Event('channelsUpdated'));
-    }
-  }
-
-  addChannel(channel: SubjectChannel) {
-    console.log('Adding channel:', channel);
-    const consistentChannel = this.ensureConsistentIds(channel);
-    this.channels.set(channel.subject, consistentChannel);
-    this.saveToStorage();
-    this.notifyUpdate();
-    console.log('Channel added, current subjects:', this.getAllSubjects());
-  }
-
   setChannels(channels: SubjectChannel[]) {
     console.log('Setting channels:', channels);
-    // Clear existing channels before setting new ones
-    this.channels.clear();
     channels.forEach(channel => {
-      this.addChannel(channel);
+      const consistentChannel = this.ensureConsistentIds(channel);
+      this.channels.set(channel.subject, consistentChannel);
     });
-    // Force a storage event to notify other tabs
-    if (isClient) {
-      localStorage.setItem(this.STORAGE_KEY + '_temp', Date.now().toString());
-      localStorage.removeItem(this.STORAGE_KEY + '_temp');
-    }
-  }
-
-  hasSubject(subject: string): boolean {
-    return this.channels.has(subject);
+    this.saveToStorage();
+    console.log('Channels after setting:', this.getAllSubjects());
   }
 
   getChannelId(subject: string, type: 'Lectures' | 'Assignments' | 'Study Materials'): number | null {
@@ -150,11 +114,9 @@ class ChannelStore {
   }
 
   clearStore() {
-    console.log('Clearing channel store...');
     this.channels.clear();
     if (isClient) {
       localStorage.removeItem(this.STORAGE_KEY);
-      this.notifyUpdate();
     }
     console.log('Store cleared');
   }

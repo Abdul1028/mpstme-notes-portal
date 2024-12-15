@@ -72,27 +72,6 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleCreateSubjects = async () => {
-    try {
-      setIsCreating(true);
-      // Clear existing channels before creating new ones
-      channelStore.clearStore();
-      
-      const result = await createSubjectFolders(selectedSubjects);
-      if (result.success) {
-        toast.success("Subjects created successfully!");
-        router.push("/notes");
-      } else {
-        throw new Error("Failed to create subjects");
-      }
-    } catch (error) {
-      console.error('Error creating subjects:', error);
-      toast.error(error instanceof Error ? error.message : "Failed to create subjects");
-    } finally {
-      setIsCreating(false);
-    }
-  };
-
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-4">
       <Card className="mx-auto w-full max-w-2xl">

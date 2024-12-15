@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { SubjectSelector } from "@/components/subject-selector";
 import { channelStore } from "@/lib/store";
 import { FileList } from "@/components/file-list";
-import { SubjectManager } from "@/components/subject-manager";
 
 export default function NotesPage() {
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
@@ -87,8 +86,6 @@ export default function NotesPage() {
           <option value="Study Materials">Study Materials</option>
         </select>
       </div>
-
-      <SubjectManager />
 
       {selectedSubject && (
         <div className="space-y-8">

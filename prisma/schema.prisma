@@ -1,0 +1,35 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  clerkId       String    @unique
+  telegramId    BigInt?   @unique
+  sessionString String?
+  username      String?
+  firstName     String?
+  lastName      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  channels      Channel[]
+}
+
+model Channel {
+  id          Int      @id
+  title       String
+  subject     String
+  type        String   // "main" | "lectures" | "assignments" | "materials"
+  inviteLink  String?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, subject, type])
+}
