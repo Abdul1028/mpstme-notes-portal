@@ -45,7 +45,7 @@ const CHANNEL_IDS = {
 export default function NotesPage() {
   const { userId } = useAuth();
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
-  const [uploadType, setUploadType] = useState<'Theory' | 'Practical' | null>(null);
+  const [uploadType, setUploadType] = useState<'Main' | 'Theory' | 'Practical'>('Main');
   const [userSubjects, setUserSubjects] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -81,9 +81,9 @@ export default function NotesPage() {
     const formData = new FormData();
     formData.append("file", selectedFile!);
     formData.append("subject", selectedSubject);
-    formData.append("uploadType", uploadType || "Main"); // Default to Main if no type selected
+    formData.append("uploadType", uploadType);
 
-    console.log("Channel ID:", CHANNEL_IDS[selectedSubject][uploadType || "Main"]);
+    console.log("Channel ID:", CHANNEL_IDS[selectedSubject][uploadType]);
 
     const response = await fetch("/api/upload", {
       method: "POST",
@@ -98,7 +98,7 @@ export default function NotesPage() {
     toast.success("File uploaded successfully to Telegram!");
   };
 
-  const uniqueSubjects = Array.from(new Set(userSubjects)); // Remove duplicates
+  const uniqueSubjects = Array.from(new Set(userSubjects));
 
   return (
     <div className="container py-6">
@@ -121,11 +121,12 @@ export default function NotesPage() {
               </SelectContent>
             </Select>
 
-            <Select value={uploadType || ""} onValueChange={setUploadType}>
+            <Select value={uploadType} onValueChange={setUploadType}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="Main">Main</SelectItem>
                 <SelectItem value="Theory">Theory</SelectItem>
                 <SelectItem value="Practical">Practical</SelectItem>
               </SelectContent>
@@ -141,7 +142,7 @@ export default function NotesPage() {
             />
             <Button 
               onClick={handleFileUpload} 
-              disabled={!selectedSubject || !selectedFile} // Disable if no subject or file selected
+              disabled={!selectedSubject || !selectedFile}
               className="ml-4"
             >
               <Upload className="mr-2" /> Upload
