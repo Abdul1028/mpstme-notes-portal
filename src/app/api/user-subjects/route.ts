@@ -9,21 +9,26 @@ export async function GET(req: Request) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    const userSubjects = await prisma.userSubject.findMany({
+    const subjects = await prisma.userSubject.findMany({
       where: {
         clerkId: userId,
       },
       select: {
         subject: true,
-        channelId: true,
       },
     });
 
-    console.log("Fetched user subjects with channel IDs:", userSubjects);
+    console.log("Fetched subjects for user:", subjects);
 
-    return NextResponse.json(userSubjects);
+    return NextResponse.json(subjects.map(s => s.subject));
   } catch (error) {
-    console.error("Error fetching user subjects:", error);
+    if (error instanceof Error) {
+      console.error("Error fetching user subjects:", error.message);
+    } else if (typeof error === 'string') {
+      console.error("Error fetching user subjects:", error);
+    } else {
+      console.error("Unexpected error fetching user subjects:", error);
+    }
     return new NextResponse("Internal Server Error", { status: 500 });
   }
 } 

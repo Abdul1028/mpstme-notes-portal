@@ -61,7 +61,7 @@ export async function POST(req: Request) {
         },
       });
     } catch (error) {
-      return new NextResponse("Internal Server Error", { status: 500 }, { error: error });
+      return new NextResponse("Internal Server Error", { status: 500 });
     }
 
     const { subjects } = await req.json();
