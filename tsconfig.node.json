@@ -1,13 +1,14 @@
 {
   "compilerOptions": {
+    "target": "es2017",
     "module": "commonjs",
-    "moduleResolution": "node",
-    "target": "es2020",
-    "esModuleInterop": true
+    "lib": ["es2017"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "dist"
   },
-  "ts-node": {
-    "compilerOptions": {
-      "module": "commonjs"
-    }
-  }
-} 
+  "include": ["src/scripts/**/*"],
+  "exclude": ["node_modules"]
+}

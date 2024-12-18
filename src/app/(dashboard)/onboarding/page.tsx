@@ -2,147 +2,91 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Input } from "@/components/ui/input";
+import { useAuth } from "@clerk/nextjs";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Plus, X } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { createSubjectFolders } from "@/lib/telegram";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { channelStore } from "@/lib/store";
 
-// Predefined subjects for MPSTME
-const SUGGESTED_SUBJECTS = [
-  "Mathematics",
-  "Physics",
-  "Computer Science",
-  "Electronics",
-  "Data Structures",
-  "Database Management",
-  // Add more subjects as needed
+const SUBJECTS = [
+  "Advanced Java",
+  "Software Engineering",
+  "Mobile Application Development",
+  "Human Computer Interface",
+  "Data Analytics with Python",
+  "Probability Statistics",
 ];
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const [subjects, setSubjects] = useState<string[]>([]);
-  const [newSubject, setNewSubject] = useState("");
+  const { getToken } = useAuth();
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const addSubject = () => {
-    if (newSubject && !subjects.includes(newSubject)) {
-      setSubjects([...subjects, newSubject]);
-      setNewSubject("");
-    }
-  };
-
-  const addSuggestedSubject = (subject: string) => {
-    if (!subjects.includes(subject)) {
-      setSubjects([...subjects, subject]);
-    }
-  };
-
-  const removeSubject = (index: number) => {
-    setSubjects(subjects.filter((_, i) => i !== index));
-  };
-
   const handleSubmit = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Create folders for all subjects at once
-      const result = await createSubjectFolders(subjects);
-      
-      console.log('Onboarding result:', result); // Debug log
+    if (selectedSubjects.length === 0) {
+      toast.error("Please select at least one subject");
+      return;
+    }
 
-      if (result.success) {
-        console.log('Setting channels:', result.results); // Debug log
-        // Store channel information
-        channelStore.setChannels(result.results);
-        console.log('Channels after setting:', channelStore.getAllSubjects()); // Debug log
-        
-        toast.success("Subject folders created successfully!");
-        router.push("/dashboard");
-      } else {
-        throw new Error("Failed to create subject folders");
-      }
+    setIsLoading(true);
+    try {
+      const token = await getToken();
+      const response = await fetch("/api/subjects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ subjects: selectedSubjects }),
+      });
+
+      if (!response.ok) throw new Error("Failed to save subjects");
+
+      toast.success("Subjects saved successfully!");
+      router.push("/dashboard");
     } catch (error) {
-      console.error("Error during onboarding:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to set up subjects");
+      console.error("Error saving subjects:", error);
+      toast.error("Failed to save subjects");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4">
-      <Card className="mx-auto w-full max-w-2xl">
+    <div className="container max-w-2xl py-8">
+      <Card>
         <CardHeader>
-          <CardTitle>Welcome to MPSTME Notes</CardTitle>
-          <CardDescription>
-            Select your subjects to get started. We'll create organized folders for each subject.
-          </CardDescription>
+          <CardTitle>Select Your Subjects</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Subject Input */}
-          <div className="flex space-x-2">
-            <Input
-              placeholder="Add a subject (e.g., Mathematics)"
-              value={newSubject}
-              onChange={(e) => setNewSubject(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && addSubject()}
-            />
-            <Button onClick={addSubject} size="icon">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Suggested Subjects */}
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium">Suggested Subjects:</h3>
-            <div className="flex flex-wrap gap-2">
-              {SUGGESTED_SUBJECTS.filter(subject => !subjects.includes(subject)).map((subject) => (
-                <Button
-                  key={subject}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => addSuggestedSubject(subject)}
-                >
-                  {subject}
-                </Button>
-              ))}
+        <CardContent className="space-y-4">
+          {SUBJECTS.map((subject) => (
+            <div key={subject} className="flex items-center space-x-2">
+              <Checkbox
+                id={subject}
+                checked={selectedSubjects.includes(subject)}
+                onCheckedChange={(checked) => {
+                  setSelectedSubjects(
+                    checked
+                      ? [...selectedSubjects, subject]
+                      : selectedSubjects.filter((s) => s !== subject)
+                  );
+                }}
+              />
+              <label htmlFor={subject} className="text-sm font-medium leading-none">
+                {subject}
+              </label>
             </div>
-          </div>
-
-          {/* Selected Subjects */}
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium">Your Subjects:</h3>
-            <div className="space-y-2">
-              {subjects.map((subject, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between rounded-md border p-2"
-                >
-                  <span>{subject}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => removeSubject(index)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <Button
-            className="w-full"
+          ))}
+          <Button 
+            className="w-full mt-4" 
             onClick={handleSubmit}
-            disabled={subjects.length === 0 || isLoading}
+            disabled={isLoading}
           >
-            {isLoading ? "Setting up..." : "Continue to Dashboard"}
+            {isLoading ? "Saving..." : "Continue"}
           </Button>
         </CardContent>
       </Card>
     </div>
   );
-} 
+}

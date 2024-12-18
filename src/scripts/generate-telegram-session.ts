@@ -1,13 +1,14 @@
-const { TelegramClient } = require("telegram");
-const { StringSession } = require("telegram/sessions");
-const { createInterface } = require("readline/promises");
-const dotenv = require("dotenv");
+import { TelegramClient } from "telegram";
+import { StringSession } from "telegram/sessions";
+import { createInterface } from "readline/promises";
+import dotenv from "dotenv";
 
 // Load environment variables
 dotenv.config({ path: '.env.local' });
 
 const apiId = process.env.TELEGRAM_API_ID;
 const apiHash = process.env.TELEGRAM_API_HASH;
+console.log(apiId, apiHash);
 
 if (!apiId || !apiHash) {
     throw new Error("TELEGRAM_API_ID and TELEGRAM_API_HASH must be set in .env.local");
@@ -33,7 +34,7 @@ const askQuestion = async (question: string) => {
             phoneNumber: async () => await askQuestion("Phone number: "),
             password: async () => await askQuestion("Password (if any): "),
             phoneCode: async () => await askQuestion("Verification code: "),
-            onError: (err) => console.log(err),
+            onError: (err: Error) => console.log(err),
         });
 
         console.log("\nSession string:", client.session.save());

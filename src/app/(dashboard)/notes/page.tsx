@@ -1,107 +1,99 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileUpload } from "@/components/file-upload";
-import { telegramService } from "@/lib/telegram";
 import { toast } from "sonner";
-import { SubjectSelector } from "@/components/subject-selector";
-import { channelStore } from "@/lib/store";
-import { FileList } from "@/components/file-list";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAuth } from "@clerk/nextjs";
 
 export default function NotesPage() {
+  const { userId } = useAuth();
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
-  const [uploadType, setUploadType] = useState<'Lectures' | 'Assignments' | 'Study Materials'>('Lectures');
-  const [selectedChannelId, setSelectedChannelId] = useState<number | null>(null);
+  const [uploadType, setUploadType] = useState<'Theory' | 'Practical'>('Theory');
+  const [userSubjects, setUserSubjects] = useState<{ subject: string; channelId: string }[]>([]);
 
-  const handleSubjectSelect = (subject: string) => {
-    setSelectedSubject(subject);
-    const channelId = channelStore.getChannelId(subject, uploadType);
-    console.log('Selected subject:', subject, 'Type:', uploadType, 'Channel ID:', channelId);
-    setSelectedChannelId(channelId);
-  };
-
-  const handleTypeChange = (type: typeof uploadType) => {
-    setUploadType(type);
-    if (selectedSubject) {
-      const channelId = channelStore.getChannelId(selectedSubject, type);
-      console.log('Changed type:', type, 'Subject:', selectedSubject, 'Channel ID:', channelId);
-      setSelectedChannelId(channelId);
-    }
-  };
-
-  // Debug logging of channel store on mount
   useEffect(() => {
-    console.log('Available subjects:', channelStore.getAllSubjects());
-    channelStore.logChannels();
-  }, []);
+    const fetchUserSubjects = async () => {
+      try {
+        const response = await fetch("/api/user-subjects");
+        if (!response.ok) throw new Error("Failed to fetch subjects");
+        const subjects = await response.json();
+        console.log("Fetched subjects:", subjects);
+        setUserSubjects(subjects);
+      } catch (error) {
+        console.error("Error fetching user subjects:", error);
+        toast.error("Failed to load subjects");
+      }
+    };
+
+    fetchUserSubjects();
+  }, [userId]);
 
   const handleFileUpload = async (file: File) => {
     try {
-      if (!selectedSubject) {
+      if (!selectedSubject || !userId) {
         toast.error("Please select a subject first");
         return;
       }
-
-      const channelId = channelStore.getChannelId(selectedSubject, uploadType);
-      console.log('Uploading to channel ID:', channelId);
       
-      if (!channelId) {
-        toast.error("Channel not found for selected subject");
-        return;
-      }
-
-      await telegramService.uploadFile(channelId, file);
-      toast.success("File uploaded successfully!");
-      
-      // Force refresh of the FileList component by changing the key
-      setSelectedChannelId(null);
-      setTimeout(() => setSelectedChannelId(channelId), 100);
+      // Placeholder for file upload
+      toast.success("File upload simulation successful!");
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error(error instanceof Error ? error.message : "Failed to upload file");
+      toast.error("Failed to upload file");
     }
   };
 
+  const uniqueSubjects = Array.from(new Set(userSubjects.map(item => item.subject))); // Remove duplicates
+
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Notes</h2>
-          <p className="text-muted-foreground">
-            View and manage all your notes
-          </p>
-        </div>
-      </div>
+    <div className="container py-6">
+      <div className="flex gap-4 mb-6">
+        <Select onValueChange={setSelectedSubject}>
+          <SelectTrigger className="w-[280px]">
+            <SelectValue placeholder="Select a subject" />
+          </SelectTrigger>
+          <SelectContent>
+            {uniqueSubjects.map((subject) => (
+              <SelectItem key={subject} value={subject}>
+                {subject}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-      <div className="flex items-center gap-4">
-        <SubjectSelector onSelect={handleSubjectSelect} />
-        <select
-          value={uploadType}
-          onChange={(e) => handleTypeChange(e.target.value as typeof uploadType)}
-          className="border rounded-md p-2"
-        >
-          <option value="Lectures">Lectures</option>
-          <option value="Assignments">Assignments</option>
-          <option value="Study Materials">Study Materials</option>
-        </select>
+        <Select value={uploadType} onValueChange={(value: 'Theory' | 'Practical') => setUploadType(value)}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Select type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Theory">Theory</SelectItem>
+            <SelectItem value="Practical">Practical</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
-
+      
       {selectedSubject && (
         <div className="space-y-8">
-          <FileUpload onUpload={handleFileUpload} />
-          {selectedChannelId && (
-            <Card>
-              <CardContent className="p-6">
-                <FileList 
-                  key={selectedChannelId} 
-                  channelId={selectedChannelId} 
-                />
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardContent className="p-6">
+              <div className="text-center text-gray-500">
+                Select a subject and type to view files
+              </div>
+              <div className="mt-4">
+                <h3 className="font-semibold">Joined Channels:</h3>
+                <ul>
+                  {userSubjects
+                    .filter(subject => subject.subject === selectedSubject)
+                    .map(({ channelId }) => (
+                      <li key={channelId}>{channelId}</li>
+                    ))}
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
   );
-} 
+}

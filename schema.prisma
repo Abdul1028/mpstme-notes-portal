@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = env("DATABASE_URL") // Ensure this matches your environment variable
 }
 
 model User {
@@ -19,7 +19,7 @@ model User {
   tempPhoneCodeHash String?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
-  subjects        UserSubject[] @relation("UserRelation")
+  subjects        UserSubject[] @relation("UserSubjects")
   files           File[]
 }
 
@@ -29,7 +29,7 @@ model UserSubject {
   subject         String
   channelId       BigInt
   type            String   // "Main" | "Theory" | "Practical"
-  user            User     @relation(fields: [clerkId], references: [clerkId]) // Reference to Clerk ID
+  user            User     @relation("UserSubjects", fields: [clerkId], references: [clerkId])
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
