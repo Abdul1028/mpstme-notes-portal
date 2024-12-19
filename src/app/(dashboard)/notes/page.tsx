@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@clerk/nextjs";
-import { Loader2 } from "lucide-react";
+import { Loader2, FileText, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const CHANNEL_IDS = {
@@ -51,6 +51,14 @@ export default function NotesPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [files, setFiles] = useState<Array<{
+    id: string;
+    name: string;
+    size: number;
+    uploadedAt: string;
+    url?: string;
+  }>>([]);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
 
   useEffect(() => {
     const fetchUserSubjects = async () => {
@@ -67,6 +75,32 @@ export default function NotesPage() {
 
     fetchUserSubjects();
   }, [userId]);
+
+  useEffect(() => {
+    const fetchFiles = async () => {
+      if (!selectedSubject) return;
+      
+      setIsLoadingFiles(true);
+      try {
+        const response = await fetch(
+          `/api/files?subject=${encodeURIComponent(selectedSubject)}&type=${uploadType}`
+        );
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to fetch files');
+        }
+        const data = await response.json();
+        setFiles(data);
+      } catch (error) {
+        console.error("Error fetching files:", error);
+        toast.error(error instanceof Error ? error.message : "Failed to load files");
+      } finally {
+        setIsLoadingFiles(false);
+      }
+    };
+
+    fetchFiles();
+  }, [selectedSubject, uploadType]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
@@ -300,9 +334,52 @@ export default function NotesPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-center text-muted-foreground py-8">
-              Select a subject and type to view your uploaded files
-            </div>
+            {isLoadingFiles ? (
+              <div className="flex justify-center items-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            ) : files.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                No files found for this subject and type
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {files.map((file) => (
+                  <div
+                    key={file.id}
+                    className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="p-2 rounded-md bg-primary/10">
+                        <FileText className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{file.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {file.size < 1024 * 1024
+                            ? `${Math.round(file.size / 1024)} KB`
+                            : `${Math.round(file.size / (1024 * 1024))} MB`} •{" "}
+                          {new Date(file.uploadedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    {file.url && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        asChild
+                        className="text-muted-foreground hover:text-primary"
+                      >
+                        <a href={file.url} target="_blank" rel="noopener noreferrer">
+                          <Download className="h-4 w-4" />
+                          <span className="sr-only">Download file</span>
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
