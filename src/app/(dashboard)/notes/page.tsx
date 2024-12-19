@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@clerk/nextjs";
-import { Upload } from "lucide-react";
+import { Upload, FileText, Image as ImageIcon } from "lucide-react";
 
 const CHANNEL_IDS = {
   "Advanced Java": {
@@ -48,6 +48,7 @@ export default function NotesPage() {
   const [uploadType, setUploadType] = useState<'Main' | 'Theory' | 'Practical'>('Main');
   const [userSubjects, setUserSubjects] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUserSubjects = async () => {
@@ -68,7 +69,10 @@ export default function NotesPage() {
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
-      setSelectedFile(event.target.files[0]);
+      const file = event.target.files[0];
+      setSelectedFile(file);
+      const previewUrl = URL.createObjectURL(file);
+      setFilePreview(previewUrl);
     }
   };
 
@@ -102,7 +106,7 @@ export default function NotesPage() {
 
   return (
     <div className="container py-6">
-      <Card className="mb-6">
+      <Card className="mb-6 shadow-lg">
         <CardHeader>
           <CardTitle>Select Subject and Upload File</CardTitle>
         </CardHeader>
@@ -148,6 +152,27 @@ export default function NotesPage() {
               <Upload className="mr-2" /> Upload
             </Button>
           </div>
+
+          {filePreview && (
+            <div className="mt-4">
+              <Card>
+                <CardContent>
+                  <h3 className="text-lg font-semibold">File Preview</h3>
+                  <div className="flex items-center">
+                    {selectedFile?.type.startsWith("image/") ? (
+                      <img src={filePreview} alt="File Preview" className="w-32 h-32 object-cover mr-4 rounded" />
+                    ) : (
+                      <FileText className="w-32 h-32 text-gray-500 mr-4" />
+                    )}
+                    <div>
+                      <p className="text-sm font-medium">{selectedFile?.name}</p>
+                      <p className="text-sm text-gray-500">{(selectedFile?.size || 0) / 1024} KB</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </CardContent>
       </Card>
 

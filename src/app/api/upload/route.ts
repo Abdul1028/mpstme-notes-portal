@@ -4,6 +4,7 @@ import path from 'path';
 import { TelegramClient } from 'telegram';
 import { StringSession } from 'telegram/sessions';
 import { getAuth } from '@clerk/nextjs/server';
+import { prisma } from '@/lib/prisma'; // Import your Prisma client
 
 const CHANNEL_IDS = {
   "Advanced Java": {
@@ -48,27 +49,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
   }
 
-  const uploadDir = path.join(process.cwd(), 'uploads'); // Ensure this directory exists
-  // Create the uploads directory if it doesn't exist
+  const uploadDir = path.join(process.cwd(), 'uploads');
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
   }
 
   const filePath = path.join(uploadDir, file.name);
-
-  // Save the file temporarily
   const fileStream = fs.createWriteStream(filePath);
   const fileBuffer = Buffer.from(await file.arrayBuffer());
   fileStream.write(fileBuffer);
   fileStream.end();
 
-  // Get userId from Clerk
   const { userId } = getAuth(request);
   if (!userId) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
-  // Initialize Telegram client
   const client = new TelegramClient(
     new StringSession(process.env.TELEGRAM_SESSION!),
     parseInt(process.env.TELEGRAM_API_ID!),
@@ -80,28 +76,41 @@ export async function POST(request: Request) {
 
   await client.connect();
 
-  // Get the channel ID based on the subject and upload type
-  const channelId = CHANNEL_IDS[subject]?.[uploadType || "Main"]; // Default to Main if no type selected
-
+  const channelId = CHANNEL_IDS[subject]?.[uploadType || "Main"];
   if (!channelId) {
     return NextResponse.json({ error: 'Invalid channel' }, { status: 400 });
   }
 
-  // Upload the file to the Telegram channel
   try {
     await client.sendFile(channelId, {
       file: filePath,
-      caption: `Uploaded file: ${file.name}`,
+      caption: `Uploaded by user ${userId}: ${file.name}`,
     });
+
+    // await prisma.file.create({
+    //   data: {
+    //     name: file.name,
+    //     size: file.size,
+    //     url: filePath,
+    //     userId: userId,
+    //     subject: subject,
+    //     type: uploadType || "Main",
+    //   },
+    // });
+    
   } catch (error) {
-    console.error('Error uploading to Telegram:', error);
-    return NextResponse.json({ error: 'Failed to upload to Telegram' }, { status: 500 });
+    if (error instanceof Error) {
+      console.error('Error uploading to Telegram:', error.message);
+      return NextResponse.json({ error: `Failed to upload to Telegram: ${error.message}` }, { status: 500 });
+    } else {
+      console.error('Unexpected error:', error);
+      return NextResponse.json({ error: 'Failed to upload to Telegram: Unexpected error occurred' }, { status: 500 });
+    }
   } finally {
     await client.disconnect();
   }
 
-  // Optionally, delete the file after upload
-  fs.unlinkSync(filePath);
+  fs.unlinkSync(filePath); // Optionally delete the file after upload
 
   return NextResponse.json({ message: 'File uploaded successfully to Telegram' });
 } 
