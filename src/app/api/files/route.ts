@@ -85,8 +85,7 @@ export async function GET(request: NextRequest) {
             )?.fileName || "Unnamed File",
             size: document.size,
             uploadedAt: new Date(msg.date * 1000).toISOString(),
-            // Generate a temporary download URL if needed
-            // url: `/api/download/${msg.id}` // You'll need to implement this endpoint
+            url: `/api/files/${msg.id}`,
           };
         });
 

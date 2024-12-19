@@ -7,8 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@clerk/nextjs";
-import { Loader2, FileText, Download } from "lucide-react";
+import { Loader2, FileText, Download, FileImage, FileArchive, FileCode, File } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FilePreview } from "@/components/file-preview";
+import { format } from "date-fns";
 
 const CHANNEL_IDS = {
   "Advanced Java": {
@@ -59,6 +62,13 @@ export default function NotesPage() {
     url?: string;
   }>>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [previewFile, setPreviewFile] = useState<{
+    id: string;
+    name: string;
+    size: number;
+    uploadedAt: string;
+    url?: string;
+  } | null>(null);
 
   useEffect(() => {
     const fetchUserSubjects = async () => {
@@ -149,6 +159,75 @@ export default function NotesPage() {
   };
 
   const uniqueSubjects = Array.from(new Set(userSubjects));
+
+  const handleFilePreview = (file: {
+    id: string;
+    name: string;
+    size: number;
+    uploadedAt: string;
+    url?: string;
+  }) => {
+    setPreviewFile(file);
+  };
+
+  const formatFileSize = (size: number) => {
+    if (size < 1024) {
+      return `${size} B`;
+    } else if (size < 1024 * 1024) {
+      return `${Math.round(size / 1024)} KB`;
+    } else if (size < 1024 * 1024 * 1024) {
+      return `${Math.round(size / (1024 * 1024))} MB`;
+    } else {
+      return `${Math.round(size / (1024 * 1024 * 1024))} GB`;
+    }
+  };
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString();
+  };
+
+  const getFileIcon = (fileName: string) => {
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    switch (extension) {
+      case 'pdf':
+        return <FileText className="h-5 w-5 text-primary" />;
+      case 'doc':
+      case 'docx':
+        return <FileText className="h-5 w-5 text-primary" />;
+      case 'xls':
+      case 'xlsx':
+        return <FileText className="h-5 w-5 text-primary" />;
+      case 'ppt':
+      case 'pptx':
+        return <FileText className="h-5 w-5 text-primary" />;
+      case 'txt':
+        return <FileText className="h-5 w-5 text-primary" />;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+        return <img src="/icons/image.svg" alt="Image" className="h-5 w-5 text-primary" />;
+      case 'mp4':
+      case 'avi':
+      case 'mov':
+        return <img src="/icons/video.svg" alt="Video" className="h-5 w-5 text-primary" />;
+      case 'mp3':
+      case 'wav':
+        return <img src="/icons/audio.svg" alt="Audio" className="h-5 w-5 text-primary" />;
+      case 'zip':
+      case 'rar':
+      case '7z':
+        return <FileArchive className="h-5 w-5 text-primary" />;
+      case 'js':
+      case 'ts':
+      case 'jsx':
+      case 'tsx':
+      case 'py':
+      case 'java':
+        return <FileCode className="h-5 w-5 text-primary" />;
+      default:
+        return <FileText className="h-5 w-5 text-muted-foreground" />;
+    }
+  };
 
   return (
     <div className="container py-6 max-w-4xl mx-auto">
@@ -328,7 +407,10 @@ export default function NotesPage() {
       {selectedSubject && (
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle>Your Uploaded Files</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Your Uploaded Files
+            </CardTitle>
             <CardDescription>
               Files you've uploaded for {selectedSubject} ({uploadType})
             </CardDescription>
@@ -340,49 +422,78 @@ export default function NotesPage() {
               </div>
             ) : files.length === 0 ? (
               <div className="text-center text-muted-foreground py-8">
-                No files found for this subject and type
+                <div className="flex flex-col items-center gap-2">
+                  <FileText className="h-12 w-12 text-muted-foreground/50" />
+                  <p>No files found for this subject and type</p>
+                </div>
               </div>
             ) : (
               <div className="space-y-4">
-                {files.map((file) => (
-                  <div
-                    key={file.id}
-                    className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="p-2 rounded-md bg-primary/10">
-                        <FileText className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-medium">{file.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {file.size < 1024 * 1024
-                            ? `${Math.round(file.size / 1024)} KB`
-                            : `${Math.round(file.size / (1024 * 1024))} MB`} •{" "}
-                          {new Date(file.uploadedAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    {file.url && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        asChild
-                        className="text-muted-foreground hover:text-primary"
-                      >
-                        <a href={file.url} target="_blank" rel="noopener noreferrer">
-                          <Download className="h-4 w-4" />
-                          <span className="sr-only">Download file</span>
-                        </a>
-                      </Button>
-                    )}
-                  </div>
-                ))}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {files.map((file) => (
+                    <Card
+                      key={file.id}
+                      className="hover:bg-accent/50 transition-colors cursor-pointer group"
+                      onClick={() => handleFilePreview(file)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-4">
+                          <div className="p-2 rounded-md bg-primary/10">
+                            {getFileIcon(file.name)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate" title={file.name}>
+                              {file.name}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {formatFileSize(file.size)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(file.uploadedAt)}
+                            </p>
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            {file.url && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.open(file.url, '_blank');
+                                }}
+                              >
+                                <Download className="h-4 w-4" />
+                                <span className="sr-only">Download file</span>
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={!!previewFile} onOpenChange={() => setPreviewFile(null)}>
+        <DialogContent className="max-w-4xl w-full">
+          <DialogHeader>
+            <DialogTitle>{previewFile?.name}</DialogTitle>
+            <DialogDescription>
+              {formatFileSize(previewFile?.size || 0)} • {formatDate(previewFile?.uploadedAt || '')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-[400px] max-h-[600px] overflow-auto">
+            {previewFile && (
+              <FilePreview file={previewFile} />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
