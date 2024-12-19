@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Loader2, Download } from "lucide-react";
+import { Loader2, Download, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface FilePreviewProps {
   file: {
@@ -9,12 +10,43 @@ interface FilePreviewProps {
     size: number;
     uploadedAt: string;
     url?: string;
+    type?: 'photo' | 'document';
   };
 }
 
 export function FilePreview({ file }: FilePreviewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const handleDownload = async () => {
+    if (file.url) {
+      try {
+        // Fetch the file
+        const response = await fetch(file.url);
+        if (!response.ok) throw new Error('Download failed');
+        
+        // Get the blob from the response
+        const blob = await response.blob();
+        
+        // Create a URL for the blob
+        const downloadUrl = window.URL.createObjectURL(blob);
+        
+        // Create and trigger download
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        
+        // Cleanup
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(downloadUrl);
+      } catch (error) {
+        console.error('Download error:', error);
+        toast.error('Failed to download file');
+      }
+    }
+  };
 
   if (!file.url) {
     return (
@@ -26,79 +58,47 @@ export function FilePreview({ file }: FilePreviewProps) {
 
   const extension = file.name.split('.').pop()?.toLowerCase();
 
-  switch (extension) {
-    case 'jpg':
-    case 'jpeg':
-    case 'png':
-    case 'gif':
-      return (
-        <div className="relative">
-          {loading && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Loader2 className="h-6 w-6 animate-spin" />
-            </div>
-          )}
-          <img
-            src={file.url}
-            alt={file.name}
-            className="w-full h-auto"
-            onLoad={() => setLoading(false)}
-            onError={() => setError('Failed to load image')}
-          />
-          {error && (
-            <div className="text-center text-destructive">{error}</div>
-          )}
-        </div>
-      );
-
-    case 'pdf':
-      return (
+  if (extension === 'pdf') {
+    return (
+      <div className="relative">
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/50">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+        )}
         <iframe
           src={file.url}
           className="w-full h-[600px]"
           title={file.name}
+          onLoad={() => setLoading(false)}
+          onError={() => {
+            setLoading(false);
+            setError('Failed to load PDF');
+          }}
         />
-      );
-
-    case 'mp4':
-    case 'webm':
-      return (
-        <video
-          controls
-          className="w-full max-h-[600px]"
-          onLoadStart={() => setLoading(true)}
-          onLoadedData={() => setLoading(false)}
-        >
-          <source src={file.url} type={`video/${extension}`} />
-          Your browser does not support the video tag.
-        </video>
-      );
-
-    case 'mp3':
-    case 'wav':
-      return (
-        <audio
-          controls
-          className="w-full mt-4"
-          onLoadStart={() => setLoading(true)}
-          onLoadedData={() => setLoading(false)}
-        >
-          <source src={file.url} type={`audio/${extension}`} />
-          Your browser does not support the audio tag.
-        </audio>
-      );
-
-    default:
-      return (
-        <div className="flex flex-col items-center justify-center h-[400px] gap-4">
-          <p className="text-muted-foreground">Preview not available for this file type</p>
-          <Button asChild>
-            <a href={file.url} target="_blank" rel="noopener noreferrer">
+        {error && (
+          <div className="flex flex-col items-center justify-center gap-4 py-8">
+            <p className="text-destructive">{error}</p>
+            <Button variant="outline" onClick={handleDownload}>
               <Download className="mr-2 h-4 w-4" />
               Download File
-            </a>
-          </Button>
-        </div>
-      );
+            </Button>
+          </div>
+        )}
+      </div>
+    );
   }
+
+  return (
+    <div className="flex flex-col items-center justify-center h-[400px] gap-4">
+      <FileText className="h-16 w-16 text-muted-foreground" />
+      <p className="text-muted-foreground">
+        {file.type === 'photo' ? 'Download to view image' : 'Download to view file'}
+      </p>
+      <Button onClick={handleDownload}>
+        <Download className="mr-2 h-4 w-4" />
+        Download File
+      </Button>
+    </div>
+  );
 }

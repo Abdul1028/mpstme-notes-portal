@@ -37,6 +37,30 @@ const CHANNEL_IDS = {
   }
 } as const;
 
+// Helper function to get content type
+function getContentType(fileName: string, defaultType = "application/octet-stream") {
+  const extension = fileName.split('.').pop()?.toLowerCase();
+  const mimeTypes: Record<string, string> = {
+    // Images
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'gif': 'image/gif',
+    // Documents
+    'pdf': 'application/pdf',
+    'doc': 'application/msword',
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    // Audio
+    'mp3': 'audio/mpeg',
+    'wav': 'audio/wav',
+    // Video
+    'mp4': 'video/mp4',
+    'webm': 'video/webm',
+  };
+
+  return mimeTypes[extension || ''] || defaultType;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -57,11 +81,9 @@ export async function GET(
     await client.connect();
 
     try {
-      // Search for the message in all channels
       const messageId = parseInt(params.id);
       let foundMessage = null;
 
-      // Iterate through all channels to find the message
       for (const subject of Object.values(CHANNEL_IDS)) {
         for (const channelId of Object.values(subject)) {
           try {
@@ -73,7 +95,6 @@ export async function GET(
               break;
             }
           } catch (e) {
-            // Skip if we can't access this channel or message not found
             continue;
           }
         }
@@ -85,18 +106,36 @@ export async function GET(
       }
 
       const buffer = await client.downloadMedia(foundMessage.media);
-      const document = foundMessage.media.document as Api.Document;
-      const fileName = document.attributes.find(
-        (attr): attr is Api.DocumentAttributeFilename => 
-          attr.className === "DocumentAttributeFilename"
-      )?.fileName || "file";
       
-      return new NextResponse(buffer as Buffer, {
-        headers: {
-          "Content-Type": document.mimeType || "application/octet-stream",
-          "Content-Disposition": `inline; filename="${fileName}"`,
-        },
-      });
+      if ('photo' in foundMessage.media) {
+        // Handle photos
+        return new NextResponse(buffer as Buffer, {
+          headers: {
+            "Content-Type": "image/jpeg",
+            "Content-Disposition": `inline; filename="photo_${foundMessage.id}.jpg"`,
+            "Cache-Control": "public, max-age=31536000",
+          },
+        });
+      } else if ('document' in foundMessage.media) {
+        // Handle documents
+        const document = foundMessage.media.document as Api.Document;
+        const fileName = document.attributes.find(
+          (attr): attr is Api.DocumentAttributeFilename => 
+            attr.className === "DocumentAttributeFilename"
+        )?.fileName || `file_${foundMessage.id}`;
+
+        const contentType = document.mimeType || getContentType(fileName);
+        
+        return new NextResponse(buffer as Buffer, {
+          headers: {
+            "Content-Type": contentType,
+            "Content-Disposition": `inline; filename="${fileName}"`,
+            "Cache-Control": "public, max-age=31536000",
+          },
+        });
+      }
+
+      return new NextResponse("Unsupported media type", { status: 400 });
     } finally {
       await client.disconnect();
     }

@@ -71,22 +71,43 @@ export async function GET(request: NextRequest) {
     try {
       const channelId = CHANNEL_IDS[subject][type];
       const messages = await client.getMessages(channelId, {
-        limit: 100, // Adjust this number as needed
+        limit: 100,
       });
 
       const files = messages
-        .filter((msg): msg is Message => !!msg && !!msg.media && 'document' in msg.media)
+        .filter((msg): msg is Message => {
+          // Check for both document and photo types
+          return !!msg && (
+            (!!msg.media && 'document' in msg.media) || // Document type
+            (!!msg.media && 'photo' in msg.media)       // Photo type
+          );
+        })
         .map(msg => {
-          const document = msg.media?.document as Api.Document;
-          return {
-            id: msg.id.toString(),
-            name: document.attributes.find((attr): attr is Api.DocumentAttributeFilename => 
-              attr.className === 'DocumentAttributeFilename'
-            )?.fileName || "Unnamed File",
-            size: document.size,
-            uploadedAt: new Date(msg.date * 1000).toISOString(),
-            url: `/api/files/${msg.id}`,
-          };
+          if ('photo' in msg.media!) {
+            // Handle photo type
+            const photo = msg.media.photo as Api.Photo;
+            return {
+              id: msg.id.toString(),
+              name: `photo_${msg.id}.jpg`,
+              size: photo.sizes[photo.sizes.length - 1].size || 0,
+              uploadedAt: new Date(msg.date * 1000).toISOString(),
+              url: `/api/files/${msg.id}`,
+              type: 'photo'
+            };
+          } else {
+            // Handle document type
+            const document = msg.media?.document as Api.Document;
+            return {
+              id: msg.id.toString(),
+              name: document.attributes.find((attr): attr is Api.DocumentAttributeFilename => 
+                attr.className === 'DocumentAttributeFilename'
+              )?.fileName || "Unnamed File",
+              size: document.size,
+              uploadedAt: new Date(msg.date * 1000).toISOString(),
+              url: `/api/files/${msg.id}`,
+              type: 'document'
+            };
+          }
         });
 
       return NextResponse.json(files);

@@ -453,20 +453,58 @@ export default function NotesPage() {
                             </p>
                           </div>
                           <div className="flex flex-col gap-2">
-                            {file.url && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="opacity-0 group-hover:opacity-100 transition-opacity"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.open(file.url, '_blank');
-                                }}
-                              >
-                                <Download className="h-4 w-4" />
-                                <span className="sr-only">Download file</span>
-                              </Button>
-                            )}
+                            {/* Preview Button */}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleFilePreview(file);
+                              }}
+                            >
+                              <FileText className="h-4 w-4" />
+                              <span className="sr-only">Preview file</span>
+                            </Button>
+                            {/* Download Button */}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (file.url) {
+                                  try {
+                                    // Fetch the file
+                                    const response = await fetch(file.url);
+                                    if (!response.ok) throw new Error('Download failed');
+                                    
+                                    // Get the blob from the response
+                                    const blob = await response.blob();
+                                    
+                                    // Create a URL for the blob
+                                    const downloadUrl = window.URL.createObjectURL(blob);
+                                    
+                                    // Create and trigger download
+                                    const link = document.createElement('a');
+                                    link.href = downloadUrl;
+                                    link.download = file.name; // This will be the downloaded file's name
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    
+                                    // Cleanup
+                                    document.body.removeChild(link);
+                                    window.URL.revokeObjectURL(downloadUrl);
+                                  } catch (error) {
+                                    console.error('Download error:', error);
+                                    toast.error('Failed to download file');
+                                  }
+                                }
+                              }}
+                            >
+                              <Download className="h-4 w-4" />
+                              <span className="sr-only">Download file</span>
+                            </Button>
                           </div>
                         </div>
                       </CardContent>
