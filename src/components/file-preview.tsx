@@ -21,26 +21,28 @@ export function FilePreview({ file }: FilePreviewProps) {
   const handleDownload = async () => {
     if (file.url) {
       try {
-        // Fetch the file
         const response = await fetch(file.url);
         if (!response.ok) throw new Error('Download failed');
         
-        // Get the blob from the response
         const blob = await response.blob();
-        
-        // Create a URL for the blob
         const downloadUrl = window.URL.createObjectURL(blob);
         
-        // Create and trigger download
         const link = document.createElement('a');
         link.href = downloadUrl;
         link.download = file.name;
         document.body.appendChild(link);
         link.click();
         
-        // Cleanup
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(downloadUrl);
+        // Open PDFs in new tab after download
+        const extension = file.name.split('.').pop()?.toLowerCase();
+        if (extension === 'pdf') {
+          window.open(downloadUrl, '_blank');
+        }
+        
+        setTimeout(() => {
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(downloadUrl);
+        }, 100);
       } catch (error) {
         console.error('Download error:', error);
         toast.error('Failed to download file');
@@ -58,6 +60,7 @@ export function FilePreview({ file }: FilePreviewProps) {
 
   const extension = file.name.split('.').pop()?.toLowerCase();
 
+  // Only allow preview for PDF files
   if (extension === 'pdf') {
     return (
       <div className="relative">
@@ -89,12 +92,13 @@ export function FilePreview({ file }: FilePreviewProps) {
     );
   }
 
+  // For all other file types, show download option and toast
+  toast.info("Can't preview this file type, please download to view");
+
   return (
     <div className="flex flex-col items-center justify-center h-[400px] gap-4">
       <FileText className="h-16 w-16 text-muted-foreground" />
-      <p className="text-muted-foreground">
-        {file.type === 'photo' ? 'Download to view image' : 'Download to view file'}
-      </p>
+      <p className="text-muted-foreground">Preview not available for this file type</p>
       <Button onClick={handleDownload}>
         <Download className="mr-2 h-4 w-4" />
         Download File

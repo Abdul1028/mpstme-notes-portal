@@ -65,6 +65,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const { id } = await Promise.resolve(params);
+  
   try {
     const { userId } = getAuth(request);
     if (!userId) {
@@ -81,7 +83,11 @@ export async function GET(
     await client.connect();
 
     try {
-      const messageId = parseInt(params.id);
+      const messageId = parseInt(id);
+      if (isNaN(messageId)) {
+        return new NextResponse("Invalid message ID", { status: 400 });
+      }
+
       let foundMessage = null;
 
       for (const subject of Object.values(CHANNEL_IDS)) {
@@ -107,35 +113,32 @@ export async function GET(
 
       const buffer = await client.downloadMedia(foundMessage.media);
       
-      if ('photo' in foundMessage.media) {
-        // Handle photos
-        return new NextResponse(buffer as Buffer, {
-          headers: {
-            "Content-Type": "image/jpeg",
-            "Content-Disposition": `inline; filename="photo_${foundMessage.id}.jpg"`,
-            "Cache-Control": "public, max-age=31536000",
-          },
-        });
-      } else if ('document' in foundMessage.media) {
-        // Handle documents
+      if ('document' in foundMessage.media) {
         const document = foundMessage.media.document as Api.Document;
         const fileName = document.attributes.find(
           (attr): attr is Api.DocumentAttributeFilename => 
             attr.className === "DocumentAttributeFilename"
         )?.fileName || `file_${foundMessage.id}`;
 
-        const contentType = document.mimeType || getContentType(fileName);
-        
-        return new NextResponse(buffer as Buffer, {
+        // For all files, force download
+        return new NextResponse(buffer, {
           headers: {
-            "Content-Type": contentType,
-            "Content-Disposition": `inline; filename="${fileName}"`,
-            "Cache-Control": "public, max-age=31536000",
+            "Content-Type": document.mimeType || "application/octet-stream",
+            "Content-Disposition": `attachment; filename="${fileName}"`,
+            "Cache-Control": "no-cache",
           },
         });
       }
 
-      return new NextResponse("Unsupported media type", { status: 400 });
+      // For any other type of media, force download
+      return new NextResponse(buffer, {
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "Content-Disposition": `attachment; filename="file_${foundMessage.id}"`,
+          "Cache-Control": "no-cache",
+        },
+      });
+
     } finally {
       await client.disconnect();
     }

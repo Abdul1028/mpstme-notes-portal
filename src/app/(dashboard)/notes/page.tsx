@@ -7,10 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@clerk/nextjs";
-import { Loader2, FileText, Download, FileImage, FileArchive, FileCode, File } from "lucide-react";
+import { Loader2, FileText, Download, Search, Calendar, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { FilePreview } from "@/components/file-preview";
 import { format } from "date-fns";
 
 const CHANNEL_IDS = {
@@ -68,7 +66,13 @@ export default function NotesPage() {
     size: number;
     uploadedAt: string;
     url?: string;
+    content?: string;
+    type?: 'text';
   } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"name" | "date" | "size">("date");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [fileTypeFilter, setFileTypeFilter] = useState<string>("all");
 
   useEffect(() => {
     const fetchUserSubjects = async () => {
@@ -160,14 +164,68 @@ export default function NotesPage() {
 
   const uniqueSubjects = Array.from(new Set(userSubjects));
 
-  const handleFilePreview = (file: {
+  const handleFilePreview = async (file: {
     id: string;
     name: string;
     size: number;
     uploadedAt: string;
     url?: string;
   }) => {
-    setPreviewFile(file);
+    if (!file.url) return;
+
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    const isTextFile = /\.(txt|md|json|csv|log|js|ts|jsx|tsx|html|css|py|java|cpp|c|h|sql)$/i.test(file.name);
+
+    if (isTextFile) {
+      try {
+        const response = await fetch(file.url);
+        if (!response.ok) throw new Error('Failed to load file');
+        
+        const text = await response.text();
+        setPreviewFile({
+          ...file,
+          content: text,
+          type: 'text'
+        });
+      } catch (error) {
+        console.error('Preview error:', error);
+        toast.error('Failed to load file preview');
+      }
+    } else {
+      toast.info("This file type can't be previewed. Use the download button to view it.");
+    }
+  };
+
+  const handleFileDownload = async (file: {
+    id: string;
+    name: string;
+    size: number;
+    uploadedAt: string;
+    url?: string;
+  }) => {
+    if (!file.url) return;
+
+    try {
+      toast.info("Downloading file...");
+      
+      const response = await fetch(file.url);
+      if (!response.ok) throw new Error('Download failed');
+      
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = file.name;
+      document.body.appendChild(link);
+      link.click();
+      
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('Failed to download file');
+    }
   };
 
   const formatFileSize = (size: number) => {
@@ -187,46 +245,52 @@ export default function NotesPage() {
   };
 
   const getFileIcon = (fileName: string) => {
-    const extension = fileName.split('.').pop()?.toLowerCase();
-    switch (extension) {
-      case 'pdf':
-        return <FileText className="h-5 w-5 text-primary" />;
-      case 'doc':
-      case 'docx':
-        return <FileText className="h-5 w-5 text-primary" />;
-      case 'xls':
-      case 'xlsx':
-        return <FileText className="h-5 w-5 text-primary" />;
-      case 'ppt':
-      case 'pptx':
-        return <FileText className="h-5 w-5 text-primary" />;
-      case 'txt':
-        return <FileText className="h-5 w-5 text-primary" />;
-      case 'jpg':
-      case 'jpeg':
-      case 'png':
-        return <img src="/icons/image.svg" alt="Image" className="h-5 w-5 text-primary" />;
-      case 'mp4':
-      case 'avi':
-      case 'mov':
-        return <img src="/icons/video.svg" alt="Video" className="h-5 w-5 text-primary" />;
-      case 'mp3':
-      case 'wav':
-        return <img src="/icons/audio.svg" alt="Audio" className="h-5 w-5 text-primary" />;
-      case 'zip':
-      case 'rar':
-      case '7z':
-        return <FileArchive className="h-5 w-5 text-primary" />;
-      case 'js':
-      case 'ts':
-      case 'jsx':
-      case 'tsx':
-      case 'py':
-      case 'java':
-        return <FileCode className="h-5 w-5 text-primary" />;
-      default:
-        return <FileText className="h-5 w-5 text-muted-foreground" />;
-    }
+    return <FileText className="h-5 w-5 text-primary" />;
+  };
+
+  const filterAndSortFiles = (files: Array<{
+    id: string;
+    name: string;
+    size: number;
+    uploadedAt: string;
+    url?: string;
+  }>) => {
+    // First, filter files
+    let filteredFiles = files.filter(file => {
+      const matchesSearch = file.name.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      if (fileTypeFilter === "all") return matchesSearch;
+      
+      const extension = file.name.split('.').pop()?.toLowerCase() || '';
+      const fileTypes: Record<string, string[]> = {
+        document: ['pdf', 'doc', 'docx', 'txt', 'md', 'xlsx', 'xls', 'ppt', 'pptx'],
+        image: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+        video: ['mp4', 'webm', 'avi', 'mov'],
+        audio: ['mp3', 'wav', 'ogg']
+      };
+
+      return matchesSearch && fileTypes[fileTypeFilter]?.includes(extension);
+    });
+
+    // Then, sort files
+    return filteredFiles.sort((a, b) => {
+      switch (sortBy) {
+        case "name":
+          return sortOrder === "asc" 
+            ? a.name.localeCompare(b.name)
+            : b.name.localeCompare(a.name);
+        case "date":
+          return sortOrder === "asc"
+            ? new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime()
+            : new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime();
+        case "size":
+          return sortOrder === "asc"
+            ? a.size - b.size
+            : b.size - a.size;
+        default:
+          return 0;
+      }
+    });
   };
 
   return (
@@ -429,12 +493,55 @@ export default function NotesPage() {
               </div>
             ) : (
               <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search files..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Select value={fileTypeFilter} onValueChange={setFileTypeFilter}>
+                      <SelectTrigger className="w-[130px]">
+                        <SelectValue placeholder="File type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="document">Documents</SelectItem>
+                        <SelectItem value="image">Images</SelectItem>
+                        <SelectItem value="video">Videos</SelectItem>
+                        <SelectItem value="audio">Audio</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={sortBy} onValueChange={(value: "name" | "date" | "size") => setSortBy(value)}>
+                      <SelectTrigger className="w-[130px]">
+                        <SelectValue placeholder="Sort by" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="name">Name</SelectItem>
+                        <SelectItem value="date">Date</SelectItem>
+                        <SelectItem value="size">Size</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                      className="w-10"
+                    >
+                      {sortOrder === "asc" ? "↑" : "↓"}
+                    </Button>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {files.map((file) => (
+                  {filterAndSortFiles(files).map((file) => (
                     <Card
                       key={file.id}
-                      className="hover:bg-accent/50 transition-colors cursor-pointer group"
-                      onClick={() => handleFilePreview(file)}
+                      className="hover:bg-accent/50 transition-colors group"
                     >
                       <CardContent className="p-4">
                         <div className="flex items-start gap-4">
@@ -452,55 +559,12 @@ export default function NotesPage() {
                               {formatDate(file.uploadedAt)}
                             </p>
                           </div>
-                          <div className="flex flex-col gap-2">
-                            {/* Preview Button */}
+                          <div>
                             <Button
                               variant="ghost"
                               size="icon"
                               className="opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleFilePreview(file);
-                              }}
-                            >
-                              <FileText className="h-4 w-4" />
-                              <span className="sr-only">Preview file</span>
-                            </Button>
-                            {/* Download Button */}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="opacity-0 group-hover:opacity-100 transition-opacity"
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                if (file.url) {
-                                  try {
-                                    // Fetch the file
-                                    const response = await fetch(file.url);
-                                    if (!response.ok) throw new Error('Download failed');
-                                    
-                                    // Get the blob from the response
-                                    const blob = await response.blob();
-                                    
-                                    // Create a URL for the blob
-                                    const downloadUrl = window.URL.createObjectURL(blob);
-                                    
-                                    // Create and trigger download
-                                    const link = document.createElement('a');
-                                    link.href = downloadUrl;
-                                    link.download = file.name; // This will be the downloaded file's name
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    
-                                    // Cleanup
-                                    document.body.removeChild(link);
-                                    window.URL.revokeObjectURL(downloadUrl);
-                                  } catch (error) {
-                                    console.error('Download error:', error);
-                                    toast.error('Failed to download file');
-                                  }
-                                }
-                              }}
+                              onClick={() => handleFileDownload(file)}
                             >
                               <Download className="h-4 w-4" />
                               <span className="sr-only">Download file</span>
@@ -516,22 +580,6 @@ export default function NotesPage() {
           </CardContent>
         </Card>
       )}
-
-      <Dialog open={!!previewFile} onOpenChange={() => setPreviewFile(null)}>
-        <DialogContent className="max-w-4xl w-full">
-          <DialogHeader>
-            <DialogTitle>{previewFile?.name}</DialogTitle>
-            <DialogDescription>
-              {formatFileSize(previewFile?.size || 0)} • {formatDate(previewFile?.uploadedAt || '')}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="min-h-[400px] max-h-[600px] overflow-auto">
-            {previewFile && (
-              <FilePreview file={previewFile} />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
