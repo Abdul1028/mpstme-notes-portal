@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL") // Ensure this matches your environment variable
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -21,6 +21,7 @@ model User {
   updatedAt       DateTime     @updatedAt
   subjects        UserSubject[] @relation("UserSubjects")
   files           File[]
+  favorites       Favorite[]
 }
 
 model UserSubject {
@@ -33,20 +34,34 @@ model UserSubject {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  @@unique([clerkId, subject, type]) // Ensure unique combination of clerkId, subject, and type
+  @@unique([clerkId, subject, type])
 }
 
 model File {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
   name      String
   size      Int
   url       String
   userId    String
   subject   String
-  type      String   // "Theory" | "Practical"
-  user      User     @relation(fields: [userId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  type      String    // "Theory" | "Practical"
+  user      User      @relation(fields: [userId], references: [id])
+  favorites Favorite[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@index([userId, subject, type])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  fileId    String
+  user      User     @relation(fields: [userId], references: [id])
+  file      File     @relation(fields: [fileId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([userId, fileId])
+  @@index([userId])
+  @@index([fileId])
 } 

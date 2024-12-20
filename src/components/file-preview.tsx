@@ -19,34 +19,41 @@ export function FilePreview({ file }: FilePreviewProps) {
   const [error, setError] = useState<string | null>(null);
 
   const handleDownload = async () => {
-    if (file.url) {
-      try {
-        const response = await fetch(file.url);
-        if (!response.ok) throw new Error('Download failed');
-        
-        const blob = await response.blob();
-        const downloadUrl = window.URL.createObjectURL(blob);
-        
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = file.name;
-        document.body.appendChild(link);
-        link.click();
-        
-        // Open PDFs in new tab after download
-        const extension = file.name.split('.').pop()?.toLowerCase();
-        if (extension === 'pdf') {
-          window.open(downloadUrl, '_blank');
-        }
-        
-        setTimeout(() => {
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(downloadUrl);
-        }, 100);
-      } catch (error) {
-        console.error('Download error:', error);
-        toast.error('Failed to download file');
+    if (!file.url) {
+      toast.error('File URL not available');
+      return;
+    }
+
+    try {
+      toast.info("Starting download...");
+      setLoading(true);
+      
+      const response = await fetch(file.url);
+      if (!response.ok) {
+        const errorMessage = await response.text().catch(() => 'Download failed');
+        throw new Error(errorMessage || 'Download failed');
       }
+      
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = file.name;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+      
+      toast.success('Download completed');
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to download file');
+      setError(error instanceof Error ? error.message : 'Download failed');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -58,51 +65,29 @@ export function FilePreview({ file }: FilePreviewProps) {
     );
   }
 
-  const extension = file.name.split('.').pop()?.toLowerCase();
-
-  // Only allow preview for PDF files
-  if (extension === 'pdf') {
-    return (
-      <div className="relative">
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-background/50">
-            <Loader2 className="h-6 w-6 animate-spin" />
-          </div>
-        )}
-        <iframe
-          src={file.url}
-          className="w-full h-[600px]"
-          title={file.name}
-          onLoad={() => setLoading(false)}
-          onError={() => {
-            setLoading(false);
-            setError('Failed to load PDF');
-          }}
-        />
-        {error && (
-          <div className="flex flex-col items-center justify-center gap-4 py-8">
-            <p className="text-destructive">{error}</p>
-            <Button variant="outline" onClick={handleDownload}>
-              <Download className="mr-2 h-4 w-4" />
-              Download File
-            </Button>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // For all other file types, show download option and toast
-  toast.info("Can't preview this file type, please download to view");
-
   return (
     <div className="flex flex-col items-center justify-center h-[400px] gap-4">
       <FileText className="h-16 w-16 text-muted-foreground" />
       <p className="text-muted-foreground">Preview not available for this file type</p>
-      <Button onClick={handleDownload}>
-        <Download className="mr-2 h-4 w-4" />
-        Download File
+      <Button 
+        onClick={handleDownload} 
+        disabled={loading}
+      >
+        {loading ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Downloading...
+          </>
+        ) : (
+          <>
+            <Download className="mr-2 h-4 w-4" />
+            Download File
+          </>
+        )}
       </Button>
+      {error && (
+        <p className="text-sm text-destructive mt-2">{error}</p>
+      )}
     </div>
   );
 }

@@ -5,7 +5,6 @@ import { StringSession } from "telegram/sessions";
 import { Api } from "telegram/tl";
 import { Message } from "telegram/tl/custom/message";
 
-// Import or define the same CHANNEL_IDS as used in other parts of the app
 const CHANNEL_IDS = {
   "Advanced Java": {
     Main: -1002354703805n,
@@ -46,12 +45,12 @@ export async function GET(request: NextRequest) {
   try {
     const { userId } = getAuth(request);
     if (!userId) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const url = new URL(request.url);
-    const subject = url.searchParams.get("subject") as SubjectName | null;
-    const type = url.searchParams.get("type") as ChannelType | null;
+    const searchParams = new URL(request.url).searchParams;
+    const subject = searchParams.get("subject") as SubjectName | null;
+    const type = searchParams.get("type") as ChannelType | null;
 
     if (!subject || !type || !(subject in CHANNEL_IDS) || !(type in CHANNEL_IDS[subject])) {
       return NextResponse.json({ error: "Invalid subject or type" }, { status: 400 });
@@ -61,9 +60,7 @@ export async function GET(request: NextRequest) {
       new StringSession(process.env.TELEGRAM_SESSION!),
       parseInt(process.env.TELEGRAM_API_ID!),
       process.env.TELEGRAM_API_HASH!,
-      {
-        connectionRetries: 5,
-      }
+      { connectionRetries: 5 }
     );
 
     await client.connect();
@@ -76,15 +73,13 @@ export async function GET(request: NextRequest) {
 
       const files = messages
         .filter((msg): msg is Message => {
-          // Check for both document and photo types
           return !!msg && (
-            (!!msg.media && 'document' in msg.media) || // Document type
-            (!!msg.media && 'photo' in msg.media)       // Photo type
+            (!!msg.media && 'document' in msg.media) || 
+            (!!msg.media && 'photo' in msg.media)
           );
         })
         .map(msg => {
           if ('photo' in msg.media!) {
-            // Handle photo type
             const photo = msg.media.photo as Api.Photo;
             return {
               id: msg.id.toString(),
@@ -95,7 +90,6 @@ export async function GET(request: NextRequest) {
               type: 'photo'
             };
           } else {
-            // Handle document type
             const document = msg.media?.document as Api.Document;
             return {
               id: msg.id.toString(),
@@ -116,6 +110,6 @@ export async function GET(request: NextRequest) {
     }
   } catch (error) {
     console.error("Error fetching files:", error);
-    return new NextResponse("Internal Server Error", { status: 500 });
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 } 

@@ -50,3 +50,4 @@ model File {
 
   @@index([userId, subject, type])
 } 
+

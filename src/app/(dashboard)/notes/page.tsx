@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@clerk/nextjs";
-import { Loader2, FileText, Download, Search, Calendar, Filter } from "lucide-react";
+import { Loader2, FileText, Download, Search, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -58,21 +58,15 @@ export default function NotesPage() {
     size: number;
     uploadedAt: string;
     url?: string;
+    type: string;
+    isFavorite: boolean;
   }>>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
-  const [previewFile, setPreviewFile] = useState<{
-    id: string;
-    name: string;
-    size: number;
-    uploadedAt: string;
-    url?: string;
-    content?: string;
-    type?: 'text';
-  } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"name" | "date" | "size">("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [fileTypeFilter, setFileTypeFilter] = useState<string>("all");
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
   useEffect(() => {
     const fetchUserSubjects = async () => {
@@ -248,18 +242,31 @@ export default function NotesPage() {
     return <FileText className="h-5 w-5 text-primary" />;
   };
 
+  const handleFavoriteToggle = (fileId: string) => {
+    setFiles(prevFiles => prevFiles.map(file => 
+      file.id === fileId 
+        ? { ...file, isFavorite: !file.isFavorite }
+        : file
+    ));
+    
+    toast.success('Favorite toggled');
+  };
+
   const filterAndSortFiles = (files: Array<{
     id: string;
     name: string;
     size: number;
     uploadedAt: string;
     url?: string;
+    type: string;
+    isFavorite: boolean;
   }>) => {
     // First, filter files
     let filteredFiles = files.filter(file => {
       const matchesSearch = file.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesFavorite = showFavoritesOnly ? file.isFavorite : true;
       
-      if (fileTypeFilter === "all") return matchesSearch;
+      if (fileTypeFilter === "all") return matchesSearch && matchesFavorite;
       
       const extension = file.name.split('.').pop()?.toLowerCase() || '';
       const fileTypes: Record<string, string[]> = {
@@ -269,7 +276,7 @@ export default function NotesPage() {
         audio: ['mp3', 'wav', 'ogg']
       };
 
-      return matchesSearch && fileTypes[fileTypeFilter]?.includes(extension);
+      return matchesSearch && matchesFavorite && fileTypes[fileTypeFilter]?.includes(extension);
     });
 
     // Then, sort files
@@ -504,6 +511,14 @@ export default function NotesPage() {
                     />
                   </div>
                   <div className="flex gap-2">
+                    <Button
+                      variant={showFavoritesOnly ? "default" : "outline"}
+                      onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                      className="gap-2"
+                    >
+                      <Heart className="h-4 w-4" fill={showFavoritesOnly ? "currentColor" : "none"} />
+                      {showFavoritesOnly ? "All Files" : "Favorites"}
+                    </Button>
                     <Select value={fileTypeFilter} onValueChange={setFileTypeFilter}>
                       <SelectTrigger className="w-[130px]">
                         <SelectValue placeholder="File type" />
@@ -559,7 +574,21 @@ export default function NotesPage() {
                               {formatDate(file.uploadedAt)}
                             </p>
                           </div>
-                          <div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className={cn(
+                                "opacity-0 group-hover:opacity-100 transition-opacity",
+                                file.isFavorite && "text-red-500"
+                              )}
+                              onClick={() => handleFavoriteToggle(file.id)}
+                            >
+                              <Heart className="h-4 w-4" fill={file.isFavorite ? "currentColor" : "none"} />
+                              <span className="sr-only">
+                                {file.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                              </span>
+                            </Button>
                             <Button
                               variant="ghost"
                               size="icon"
