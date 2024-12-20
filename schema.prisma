@@ -22,6 +22,7 @@ model User {
   subjects        UserSubject[] @relation("UserSubjects")
   files           File[]
   favorites       Favorite[]
+  uploadedMessages MessageOwnership[]
 }
 
 model UserSubject {
@@ -64,4 +65,18 @@ model Favorite {
   @@unique([userId, fileId])
   @@index([userId])
   @@index([fileId])
+}
+
+// New model to track message ownership
+model MessageOwnership {
+  id          String   @id @default(cuid())
+  messageId   BigInt   // Telegram message ID
+  channelId   BigInt   // Telegram channel ID
+  userId      String   // Owner of the message
+  user        User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@unique([messageId, channelId])
+  @@index([userId])
+  @@index([messageId])
 } 

@@ -15,7 +15,7 @@ interface FilePreviewProps {
 }
 
 export function FilePreview({ file }: FilePreviewProps) {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleDownload = async () => {
@@ -25,8 +25,9 @@ export function FilePreview({ file }: FilePreviewProps) {
     }
 
     try {
-      toast.info("Starting download...");
       setLoading(true);
+      setError(null);
+      toast.info("Starting download...");
       
       const response = await fetch(file.url);
       if (!response.ok) {
@@ -50,20 +51,13 @@ export function FilePreview({ file }: FilePreviewProps) {
       toast.success('Download completed');
     } catch (error) {
       console.error('Download error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to download file');
-      setError(error instanceof Error ? error.message : 'Download failed');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to download file';
+      toast.error(errorMessage);
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
-
-  if (!file.url) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-muted-foreground">Preview not available</p>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col items-center justify-center h-[400px] gap-4">
@@ -81,7 +75,7 @@ export function FilePreview({ file }: FilePreviewProps) {
         ) : (
           <>
             <Download className="mr-2 h-4 w-4" />
-            Download File
+            Download {file.name}
           </>
         )}
       </Button>

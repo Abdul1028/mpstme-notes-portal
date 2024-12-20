@@ -4,6 +4,7 @@ import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions";
 import { Api } from "telegram/tl";
 import { Message } from "telegram/tl/custom/message";
+import { prisma } from "@/lib/prisma";
 
 const CHANNEL_IDS = {
   "Advanced Java": {
@@ -48,6 +49,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Get user from database
+    const user = await prisma.user.findUnique({
+      where: { clerkId: userId },
+      select: { id: true }
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
     const searchParams = new URL(request.url).searchParams;
     const subject = searchParams.get("subject") as SubjectName | null;
     const type = searchParams.get("type") as ChannelType | null;
@@ -67,6 +78,20 @@ export async function GET(request: NextRequest) {
 
     try {
       const channelId = CHANNEL_IDS[subject][type];
+
+      // Get user's owned messages in this channel
+      const ownedMessages = await prisma.messageOwnership.findMany({
+        where: {
+          userId: user.id,
+          channelId: channelId,
+        },
+        select: {
+          messageId: true,
+        },
+      });
+
+      const ownedMessageIds = new Set(ownedMessages.map(m => Number(m.messageId)));
+
       const messages = await client.getMessages(channelId, {
         limit: 100,
       });
@@ -76,7 +101,7 @@ export async function GET(request: NextRequest) {
           return !!msg && (
             (!!msg.media && 'document' in msg.media) || 
             (!!msg.media && 'photo' in msg.media)
-          );
+          ) && ownedMessageIds.has(msg.id);
         })
         .map(msg => {
           if ('photo' in msg.media!) {
@@ -87,19 +112,27 @@ export async function GET(request: NextRequest) {
               size: photo.sizes[photo.sizes.length - 1].size || 0,
               uploadedAt: new Date(msg.date * 1000).toISOString(),
               url: `/api/files/${msg.id}`,
-              type: 'photo'
+              type: 'photo',
+              isFavorite: false
             };
           } else {
             const document = msg.media?.document as Api.Document;
+            const fileName = document.attributes
+              .find((attr): attr is Api.DocumentAttributeFilename => 
+                attr.className === 'DocumentAttributeFilename'
+              )?.fileName;
+
+            // Get file name from caption if not found in attributes
+            const captionFileName = msg.message?.match(/Uploaded by .+?: (.+)$/)?.[1];
+            
             return {
               id: msg.id.toString(),
-              name: document.attributes.find((attr): attr is Api.DocumentAttributeFilename => 
-                attr.className === 'DocumentAttributeFilename'
-              )?.fileName || "Unnamed File",
+              name: fileName || captionFileName || `file_${msg.id}`,
               size: document.size,
               uploadedAt: new Date(msg.date * 1000).toISOString(),
               url: `/api/files/${msg.id}`,
-              type: 'document'
+              type: 'document',
+              isFavorite: false
             };
           }
         });
