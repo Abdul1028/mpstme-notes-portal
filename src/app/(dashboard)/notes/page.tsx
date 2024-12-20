@@ -144,6 +144,18 @@ export default function NotesPage() {
       toast.success("File uploaded successfully!");
       setSelectedFile(null);
       setFilePreview(null);
+
+      // Fetch updated files list
+      const filesResponse = await fetch(
+        `/api/files?subject=${encodeURIComponent(selectedSubject)}&type=${uploadType}`
+      );
+      if (!filesResponse.ok) {
+        const error = await filesResponse.json();
+        throw new Error(error.error || 'Failed to fetch files');
+      }
+      const updatedFiles = await filesResponse.json();
+      setFiles(updatedFiles);
+
     } catch (error) {
       toast.error("Failed to upload file");
     } finally {
