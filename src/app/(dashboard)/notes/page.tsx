@@ -13,34 +13,34 @@ import { format } from "date-fns";
 
 const CHANNEL_IDS = {
   "Advanced Java": {
-    Main: -1002354703805,
-    Theory: -1002380915545,
-    Practical: -1002428084012,
+    Main: -1002392486470,
+    Theory: -1002390876365,
+    Practical: -1002254568649,
   },
   "Data Analytics with Python": {
-    Main: -1002440181008,
-    Theory: -1002453320466,
-    Practical: -1002428199055,
+    Main: -1002428431170,
+    Theory: -1002355222084,
+    Practical: -1002301366458,
   },
   "Human Computer Interface": {
-    Main: -1002384952840,
-    Theory: -1002445086870,
-    Practical: -1002227802139,
+    Main: -1002274201455,
+    Theory: -1002428841710,
+    Practical: -1002462133059,
   },
   "Mobile Application Development": {
-    Main: -1002255805116,
-    Theory: -1002279502965,
-    Practical: -1002342357608,
+    Main: -1002390629719,
+    Theory: -1002313593362,
+    Practical: -1002453803465,
   },
   "Probability Statistics": {
-    Main: -1002276329421,
-    Theory: -1002321230535,
-    Practical: -1002493518633,
+    Main: -1002277439553,
+    Theory: -1002466989253,
+    Practical: -1002260169268,
   },
   "Software Engineering": {
-    Main: -1002370893044,
-    Theory: -1002344359474,
-    Practical: -1002424851036,
+    Main: -1002342125939,
+    Theory: -1002345923267,
+    Practical: -1002449513822,
   }
 } as const;
 

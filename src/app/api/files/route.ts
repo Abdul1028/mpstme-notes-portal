@@ -8,34 +8,34 @@ import { prisma } from "@/lib/prisma";
 
 const CHANNEL_IDS = {
   "Advanced Java": {
-    Main: -1002354703805n,
-    Theory: -1002380915545n,
-    Practical: -1002428084012n,
+    Main: BigInt("-1002392486470"),
+    Theory: BigInt("-1002390876365"),
+    Practical: BigInt("-1002254568649"),
   },
   "Data Analytics with Python": {
-    Main: -1002440181008n,
-    Theory: -1002453320466n,
-    Practical: -1002428199055n,
+    Main: BigInt("-1002428431170"),
+    Theory: BigInt("-1002355222084"),
+    Practical: BigInt("-1002301366458"),
   },
   "Human Computer Interface": {
-    Main: -1002384952840n,
-    Theory: -1002445086870n,
-    Practical: -1002227802139n,
+    Main: BigInt("-1002274201455"),
+    Theory: BigInt("-1002428841710"),
+    Practical: BigInt("-1002462133059"),
   },
   "Mobile Application Development": {
-    Main: -1002255805116n,
-    Theory: -1002279502965n,
-    Practical: -1002342357608n,
+    Main: BigInt("-1002390629719"),
+    Theory: BigInt("-1002313593362"),
+    Practical: BigInt("-1002453803465"),
   },
   "Probability Statistics": {
-    Main: -1002276329421n,
-    Theory: -1002321230535n,
-    Practical: -1002493518633n,
+    Main: BigInt("-1002277439553"),
+    Theory: BigInt("-1002466989253"),
+    Practical: BigInt("-1002260169268"),
   },
   "Software Engineering": {
-    Main: -1002370893044n,
-    Theory: -1002344359474n,
-    Practical: -1002424851036n,
+    Main: BigInt("-1002342125939"),
+    Theory: BigInt("-1002345923267"),
+    Practical: BigInt("-1002449513822"),
   }
 } as const;
 

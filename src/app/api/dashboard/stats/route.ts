@@ -16,34 +16,34 @@ const MESSAGES_LIMIT = 50;
 
 const CHANNEL_IDS = {
   "Advanced Java": {
-    Main: BigInt("-1002354703805"),
-    Theory: BigInt("-1002380915545"),
-    Practical: BigInt("-1002428084012"),
+    Main: BigInt("-1002392486470"),
+    Theory: BigInt("-1002390876365"),
+    Practical: BigInt("-1002254568649"),
   },
   "Data Analytics with Python": {
-    Main: BigInt("-1002440181008"),
-    Theory: BigInt("-1002453320466"),
-    Practical: BigInt("-1002428199055"),
+    Main: BigInt("-1002428431170"),
+    Theory: BigInt("-1002355222084"),
+    Practical: BigInt("-1002301366458"),
   },
   "Human Computer Interface": {
-    Main: BigInt("-1002384952840"),
-    Theory: BigInt("-1002445086870"),
-    Practical: BigInt("-1002227802139"),
+    Main: BigInt("-1002274201455"),
+    Theory: BigInt("-1002428841710"),
+    Practical: BigInt("-1002462133059"),
   },
   "Mobile Application Development": {
-    Main: BigInt("-1002255805116"),
-    Theory: BigInt("-1002279502965"),
-    Practical: BigInt("-1002342357608"),
+    Main: BigInt("-1002390629719"),
+    Theory: BigInt("-1002313593362"),
+    Practical: BigInt("-1002453803465"),
   },
   "Probability Statistics": {
-    Main: BigInt("-1002276329421"),
-    Theory: BigInt("-1002321230535"),
-    Practical: BigInt("-1002493518633"),
+    Main: BigInt("-1002277439553"),
+    Theory: BigInt("-1002466989253"),
+    Practical: BigInt("-1002260169268"),
   },
   "Software Engineering": {
-    Main: BigInt("-1002370893044"),
-    Theory: BigInt("-1002344359474"),
-    Practical: BigInt("-1002424851036"),
+    Main: BigInt("-1002342125939"),
+    Theory: BigInt("-1002345923267"),
+    Practical: BigInt("-1002449513822"),
   }
 };
 
