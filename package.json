@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "generate-session": "ts-node --project tsconfig.node.json src/scripts/generate-telegram-session.ts",
-    "setup-channels": "ts-node --project tsconfig.node.json src/scripts/setup-channels.ts"
+    "setup-channels": "ts-node --project tsconfig.node.json src/scripts/setup-channels.ts",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.9.2",
