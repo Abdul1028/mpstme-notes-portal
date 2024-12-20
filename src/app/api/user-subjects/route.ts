@@ -16,6 +16,7 @@ export async function GET(req: Request) {
       select: {
         subject: true,
       },
+      distinct: ['subject'],
     });
 
     console.log("Fetched subjects for user:", subjects);
