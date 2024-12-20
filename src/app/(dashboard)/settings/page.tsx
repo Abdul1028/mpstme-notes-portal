@@ -3,10 +3,10 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Save, X, Loader2, AlertTriangle } from "lucide-react";
+import { Save, X, Loader2, AlertTriangle, Check } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { toast } from "sonner";
 import {
@@ -19,14 +19,49 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+
+const ALL_SUBJECTS = [
+  {
+    name: "Advanced Java",
+    description: "Object-oriented programming and advanced Java concepts",
+    icon: "🚀",
+  },
+  {
+    name: "Software Engineering",
+    description: "Software development lifecycle and best practices",
+    icon: "⚙️",
+  },
+  {
+    name: "Mobile Application Development",
+    description: "Building mobile apps for iOS and Android",
+    icon: "📱",
+  },
+  {
+    name: "Human Computer Interface",
+    description: "User experience and interface design principles",
+    icon: "🎨",
+  },
+  {
+    name: "Data Analytics with Python",
+    description: "Data analysis and visualization using Python",
+    icon: "📊",
+  },
+  {
+    name: "Probability Statistics",
+    description: "Statistical analysis and probability theory",
+    icon: "📈",
+  },
+];
 
 export default function SettingsPage() {
   const { userId } = useAuth();
-  const [subjects, setSubjects] = useState<string[]>([]);
-  const [newSubject, setNewSubject] = useState("");
+  const [userSubjects, setUserSubjects] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [subjectToDelete, setSubjectToDelete] = useState<{ index: number; name: string } | null>(null);
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+  const [isJoining, setIsJoining] = useState(false);
 
   useEffect(() => {
     const fetchUserSubjects = async () => {
@@ -34,7 +69,7 @@ export default function SettingsPage() {
         const response = await fetch("/api/user-subjects");
         if (!response.ok) throw new Error("Failed to fetch subjects");
         const subjects = await response.json();
-        setSubjects(subjects);
+        setUserSubjects(subjects);
       } catch (error) {
         console.error("Error fetching user subjects:", error);
         toast.error("Failed to load subjects");
@@ -48,26 +83,32 @@ export default function SettingsPage() {
     }
   }, [userId]);
 
-  const addSubject = async () => {
-    if (newSubject && !subjects.includes(newSubject)) {
-      try {
-        const response = await fetch("/api/subjects", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ subjects: [newSubject] }),
-        });
+  const handleJoinSubjects = async () => {
+    if (selectedSubjects.length === 0) {
+      toast.error("Please select at least one subject");
+      return;
+    }
 
-        if (!response.ok) throw new Error("Failed to add subject");
+    setIsJoining(true);
+    try {
+      const response = await fetch("/api/subjects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ subjects: selectedSubjects }),
+      });
 
-        setSubjects([...subjects, newSubject]);
-        setNewSubject("");
-        toast.success("Subject added successfully");
-      } catch (error) {
-        console.error("Error adding subject:", error);
-        toast.error("Failed to add subject");
-      }
+      if (!response.ok) throw new Error("Failed to join subjects");
+
+      setUserSubjects([...userSubjects, ...selectedSubjects]);
+      setSelectedSubjects([]);
+      toast.success("Successfully joined new subjects!");
+    } catch (error) {
+      console.error("Error joining subjects:", error);
+      toast.error("Failed to join subjects");
+    } finally {
+      setIsJoining(false);
     }
   };
 
@@ -86,7 +127,7 @@ export default function SettingsPage() {
 
       if (!response.ok) throw new Error("Failed to remove subject");
 
-      setSubjects(subjects.filter((_, i) => i !== subjectToDelete.index));
+      setUserSubjects(userSubjects.filter((_, i) => i !== subjectToDelete.index));
       toast.success("Subject removed successfully");
     } catch (error) {
       console.error("Error removing subject:", error);
@@ -96,6 +137,10 @@ export default function SettingsPage() {
       setSubjectToDelete(null);
     }
   };
+
+  const availableSubjects = ALL_SUBJECTS.filter(
+    subject => !userSubjects.includes(subject.name)
+  );
 
   return (
     <>
@@ -115,36 +160,26 @@ export default function SettingsPage() {
           </TabsList>
 
           <TabsContent value="subjects" className="space-y-4">
+            {/* Current Subjects */}
             <Card>
               <CardHeader>
-                <CardTitle>Manage Subjects</CardTitle>
+                <CardTitle>Your Subjects</CardTitle>
                 <CardDescription>
-                  Add or remove subjects to organize your notes
+                  Subjects you are currently enrolled in
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex space-x-2">
-                  <Input
-                    placeholder="Add a subject"
-                    value={newSubject}
-                    onChange={(e) => setNewSubject(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addSubject()}
-                  />
-                  <Button onClick={addSubject} size="icon">
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
                 <div className="space-y-2">
                   {isLoading ? (
                     <div className="flex items-center justify-center py-4">
                       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                     </div>
-                  ) : subjects.length === 0 ? (
+                  ) : userSubjects.length === 0 ? (
                     <div className="text-center py-4 text-muted-foreground">
                       No subjects added yet
                     </div>
                   ) : (
-                    subjects.map((subject, index) => (
+                    userSubjects.map((subject, index) => (
                       <div
                         key={index}
                         className="flex items-center justify-between rounded-md border p-2"
@@ -164,6 +199,78 @@ export default function SettingsPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Available Subjects */}
+            {availableSubjects.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Join New Subjects</CardTitle>
+                  <CardDescription>
+                    Select additional subjects to join
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-6 sm:grid-cols-2">
+                    {availableSubjects.map((subject) => (
+                      <Card
+                        key={subject.name}
+                        className={`relative overflow-hidden transition-colors ${
+                          selectedSubjects.includes(subject.name)
+                            ? "border-primary bg-primary/5"
+                            : "hover:border-primary/50"
+                        }`}
+                      >
+                        <CardContent className="p-6">
+                          <div className="flex items-start gap-4">
+                            <div className="text-2xl">{subject.icon}</div>
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between">
+                                <h3 className="font-semibold">{subject.name}</h3>
+                                <Checkbox
+                                  checked={selectedSubjects.includes(subject.name)}
+                                  onCheckedChange={(checked) => {
+                                    setSelectedSubjects(
+                                      checked
+                                        ? [...selectedSubjects, subject.name]
+                                        : selectedSubjects.filter((s) => s !== subject.name)
+                                    );
+                                  }}
+                                />
+                              </div>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {subject.description}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {selectedSubjects.length > 0 && (
+                    <div className="mt-6 flex justify-end">
+                      <Button
+                        onClick={handleJoinSubjects}
+                        disabled={isJoining}
+                        className="w-full sm:w-auto"
+                      >
+                        {isJoining ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Joining subjects...
+                          </>
+                        ) : (
+                          <>
+                            <Check className="mr-2 h-4 w-4" />
+                            Join Selected Subjects
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="account">
