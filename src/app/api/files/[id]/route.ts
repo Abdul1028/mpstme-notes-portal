@@ -62,10 +62,17 @@ function getContentType(fileName: string, defaultType = "application/octet-strea
   return mimeTypes[extension || ''] || defaultType;
 }
 
+type Context = {
+  params: {
+    id: string;
+  };
+};
+
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
-) {
+  { params }: { params: Promise<{ id: string }> }
+): Promise<NextResponse> {
+  const { id } = await params;
   const client = new TelegramClient(
     new StringSession(process.env.TELEGRAM_SESSION!),
     parseInt(process.env.TELEGRAM_API_ID!),
@@ -82,28 +89,11 @@ export async function GET(
       );
     }
 
-    const fileId = await Promise.resolve(context.params.id);
+    const fileId = id;
     if (!fileId) {
       return NextResponse.json(
         { error: "File ID is required" },
         { status: 400 }
-      );
-    }
-
-    // Increment download count
-    try {
-      await prisma.file.update({
-        where: { id: fileId },
-        data: {
-          downloadCount: {
-            increment: 1
-          }
-        }
-      });
-    } catch (dbError) {
-      // Log the error but continue with the download
-      console.error("Error updating download count:", 
-        dbError instanceof Error ? dbError.message : "Unknown error"
       );
     }
 
@@ -122,7 +112,7 @@ export async function GET(
     for (const subject of Object.values(CHANNEL_IDS)) {
       for (const channelId of Object.values(subject)) {
         try {
-          const messages = await client.getMessages(channelId, {
+          const messages = await client.getMessages(channelId.toString(), {
             ids: [messageId],
           });
           if (messages[0]?.media) {

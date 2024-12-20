@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from 'next/server';
 import { getAuth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { TelegramClient } from "telegram";
@@ -42,11 +42,11 @@ const CHANNEL_IDS = {
 type SubjectName = keyof typeof CHANNEL_IDS;
 type ChannelType = "Main" | "Theory" | "Practical";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const { userId } = getAuth(req); // This is the Clerk user ID
+    const { userId } = getAuth(req);
     if (!userId) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     console.log("User ID:", userId);
@@ -102,7 +102,7 @@ export async function POST(req: Request) {
         // Join the channel
         try {
           await client.invoke(new Api.channels.JoinChannel({
-            channel: channelId
+            channel: channelId.toString()
           }));
         } catch (error) {
           console.error(`Failed to join channel for ${subject} ${type}:`, error);
@@ -150,15 +150,15 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
-    const { userId } = getAuth();
+    const { userId } = getAuth(req);
     if (!userId) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Get the user from the database
-    const user = await prisma.User.findUnique({
+    const user = await prisma.user.findUnique({
       where: { clerkId: userId },
     });
 
@@ -168,7 +168,9 @@ export async function GET(req: Request) {
 
     const subjects = await prisma.userSubject.findMany({
       where: {
-        userId: user.id,
+        user: {
+          id: user.id
+        },
         type: "Main",
       },
       select: {

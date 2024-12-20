@@ -43,17 +43,19 @@ type ChannelType = keyof typeof CHANNEL_IDS[SubjectName];
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { subject: string } }
+  { params }: { params: Promise<{ subject: string }> }
 ) {
   try {
+    const { subject: encodedSubject } = await params;
+    const subject = decodeURIComponent(encodedSubject) as SubjectName;
+    
+    if (!subject || !(subject in CHANNEL_IDS)) {
+      return NextResponse.json({ error: "Invalid subject" }, { status: 400 });
+    }
+
     const { userId } = getAuth(request);
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const subject = decodeURIComponent(params.subject) as SubjectName;
-    if (!subject || !(subject in CHANNEL_IDS)) {
-      return NextResponse.json({ error: "Invalid subject" }, { status: 400 });
     }
 
     // Get user from database
@@ -83,7 +85,7 @@ export async function DELETE(
         
         try {
           await client.invoke(new Api.channels.LeaveChannel({
-            channel: channelId
+            channel: channelId.toString()
           }));
         } catch (error) {
           console.error(`Failed to leave channel ${channelId} for ${subject} ${type}:`, error);

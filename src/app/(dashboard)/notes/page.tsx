@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@clerk/nextjs";
 import { Loader2, FileText, Download, Search, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
 
 const CHANNEL_IDS = {
   "Advanced Java": {
@@ -178,28 +177,7 @@ export default function NotesPage() {
     url?: string;
   }) => {
     if (!file.url) return;
-
-    const extension = file.name.split('.').pop()?.toLowerCase();
-    const isTextFile = /\.(txt|md|json|csv|log|js|ts|jsx|tsx|html|css|py|java|cpp|c|h|sql)$/i.test(file.name);
-
-    if (isTextFile) {
-      try {
-        const response = await fetch(file.url);
-        if (!response.ok) throw new Error('Failed to load file');
-        
-        const text = await response.text();
-        setPreviewFile({
-          ...file,
-          content: text,
-          type: 'text'
-        });
-      } catch (error) {
-        console.error('Preview error:', error);
-        toast.error('Failed to load file preview');
-      }
-    } else {
-      toast.info("This file type can't be previewed. Use the download button to view it.");
-    }
+    toast.info("Use the download button to view this file");
   };
 
   const handleFileDownload = async (file: {
@@ -405,7 +383,7 @@ export default function NotesPage() {
                         <div className="h-24 w-24 rounded-lg border bg-background flex items-center justify-center">
                           {selectedFile?.type.startsWith("image/") ? (
                             <img 
-                              src={filePreview} 
+                              src={filePreview || ''}
                               alt="Preview" 
                               className="w-full h-full object-cover rounded-lg"
                             />

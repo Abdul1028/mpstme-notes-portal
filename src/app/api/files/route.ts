@@ -3,8 +3,8 @@ import { getAuth } from "@clerk/nextjs/server";
 import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions";
 import { Api } from "telegram/tl";
-import { Message } from "telegram/tl/custom/message";
 import { prisma } from "@/lib/prisma";
+
 
 const CHANNEL_IDS = {
   "Advanced Java": {
@@ -92,31 +92,30 @@ export async function GET(request: NextRequest) {
 
       const ownedMessageIds = new Set(ownedMessages.map(m => Number(m.messageId)));
 
-      const messages = await client.getMessages(channelId, {
+      const messages = await client.getMessages(channelId.toString(), {
         limit: 100,
       });
 
       const files = messages
-        .filter((msg): msg is Message => {
-          return !!msg && (
-            (!!msg.media && 'document' in msg.media) || 
-            (!!msg.media && 'photo' in msg.media)
-          ) && ownedMessageIds.has(msg.id);
+        .filter((msg): msg is Api.Message => {
+          if (!msg || !msg.media) return false;
+          return ('document' in msg.media) || ('photo' in msg.media);
         })
         .map(msg => {
           if ('photo' in msg.media!) {
             const photo = msg.media.photo as Api.Photo;
+            const photoSize = photo.sizes[photo.sizes.length - 1];
             return {
               id: msg.id.toString(),
               name: `photo_${msg.id}.jpg`,
-              size: photo.sizes[photo.sizes.length - 1].size || 0,
+              size: 'size' in photoSize ? photoSize.size : 0,
               uploadedAt: new Date(msg.date * 1000).toISOString(),
               url: `/api/files/${msg.id}`,
               type: 'photo',
               isFavorite: false
             };
-          } else {
-            const document = msg.media?.document as Api.Document;
+          } else if (msg.media && 'document' in msg.media) {
+            const document = msg.media.document as Api.Document;
             const fileName = document.attributes
               .find((attr): attr is Api.DocumentAttributeFilename => 
                 attr.className === 'DocumentAttributeFilename'

@@ -44,15 +44,10 @@ const CHANNEL_IDS = {
     Main: BigInt("-1002342125939"),
     Theory: BigInt("-1002345923267"),
     Practical: BigInt("-1002449513822"),
-  }
+  },
 };
 
-// Function to invalidate cache
-export async function invalidateStatsCache(userId: string) {
-  const cacheKey = `dashboard:stats:${userId}`;
-  await redis.del(cacheKey);
-}
-
+// Function to fetch and cache stats
 async function fetchAndCacheStats(userId: string, forceRefresh = false) {
   const cacheKey = `dashboard:stats:${userId}`;
   
@@ -103,7 +98,7 @@ async function fetchAndCacheStats(userId: string, forceRefresh = false) {
       
       return Object.entries(channels).map(async ([type, channelId]) => {
         try {
-          const messages = await client.getMessages(channelId, {
+          const messages = await client.getMessages(BigInt(channelId).toString(), {
             limit: MESSAGES_LIMIT,
           });
 
@@ -140,8 +135,15 @@ async function fetchAndCacheStats(userId: string, forceRefresh = false) {
       });
     });
 
+    type FileUpload = {
+      id: string;
+      name: string;
+      uploadedAt: string;
+      subject: string;
+    };
+
     const filesArrays = await Promise.all(channelPromises);
-    recentUploads = filesArrays.flat().filter(Boolean);
+    recentUploads = filesArrays.flat().filter((file): file is FileUpload => file !== null);
 
     // Sort and limit recent uploads
     const uniqueUploads = Array.from(
@@ -178,23 +180,19 @@ async function fetchAndCacheStats(userId: string, forceRefresh = false) {
   }
 }
 
+// GET request handler
 export async function GET(request: NextRequest) {
   try {
     const { userId } = getAuth(request);
     if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if force refresh is requested
     const searchParams = new URL(request.url).searchParams;
     const forceRefresh = searchParams.get('refresh') === 'true';
 
     const stats = await fetchAndCacheStats(userId, forceRefresh);
     return NextResponse.json(stats);
-
   } catch (error) {
     console.error("Error fetching dashboard stats:", error);
     return NextResponse.json(
@@ -202,4 +200,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}
