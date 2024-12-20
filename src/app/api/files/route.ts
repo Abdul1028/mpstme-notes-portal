@@ -99,7 +99,8 @@ export async function GET(request: NextRequest) {
       const files = messages
         .filter((msg): msg is Api.Message => {
           if (!msg || !msg.media) return false;
-          return ('document' in msg.media) || ('photo' in msg.media);
+          return ('document' in msg.media || 'photo' in msg.media) && 
+                 ownedMessageIds.has(msg.id);
         })
         .map(msg => {
           if ('photo' in msg.media!) {
