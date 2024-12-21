@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { Button } from "./ui/button";
+import CustomUserButton from "./user-button";
 
 export function MainNav({
   className,
@@ -22,7 +23,7 @@ export function MainNav({
   ];
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full flex items-center justify-between">
       {/* Mobile Menu Button */}
       <Button
         variant="ghost"
@@ -59,6 +60,11 @@ export function MainNav({
           </Link>
         ))}
       </nav>
+
+      {/* User Button */}
+      <div className="flex items-center">
+        <CustomUserButton />
+      </div>
 
       {/* Mobile Navigation */}
       {isOpen && (

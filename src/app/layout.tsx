@@ -4,7 +4,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { UserButton } from "@/components/user-button";
+import CustomUserButton from "@/components/user-button";
 import "./globals.css";
 import { Toaster } from "sonner";
 
@@ -56,8 +56,8 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <div className="fixed top-4 right-4 flex items-center gap-4">
-              <UserButton />
+            <div className="fixed top-4 right-4 flex items-center gap-2">
+              <CustomUserButton />
               <ThemeToggle />
             </div>
             {children}
