@@ -10,6 +10,10 @@ import { useAuth } from "@clerk/nextjs";
 import { Loader2, FileText, Download, Search, Heart, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import { upload } from '@vercel/blob/client';
+import type { PutBlobResult } from '@vercel/blob';
+import { UploadProgress } from "@/components/ui/upload-progress";
+import type { UploadProgressEvent } from '@vercel/blob';
 
 const CHANNEL_IDS = {
   "Advanced Java": {
@@ -44,6 +48,10 @@ const CHANNEL_IDS = {
   }
 } as const;
 
+
+// Max file size
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB in bytes
+
 export default function NotesPage() {
   const { userId } = useAuth();
   const router = useRouter();
@@ -68,6 +76,9 @@ export default function NotesPage() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [fileTypeFilter, setFileTypeFilter] = useState<string>("all");
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState<"uploading" | "processing" | "complete" | "error">("uploading");
+  const [downloadingFiles, setDownloadingFiles] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchUserSubjects = async () => {
@@ -126,44 +137,89 @@ export default function NotesPage() {
       return;
     }
 
+    if (selectedFile.size > MAX_FILE_SIZE) {
+      toast.error(`File size must be less than ${formatFileSize(MAX_FILE_SIZE)}`);
+      return;
+    }
+
     setIsUploading(true);
+    setUploadProgress(0);
+    setUploadStatus("uploading");
+
     try {
+      console.log("[Client] Starting blob upload...");
+      const blob = await upload(selectedFile.name, selectedFile, {
+        access: 'public',
+        handleUploadUrl: '/api/blob-upload',
+        onUploadProgress: (progress: UploadProgressEvent) => {
+          setUploadProgress(Math.round((progress.loaded / progress.total) * 100));
+        },
+      });
+      
+      setUploadStatus("processing");
+      setUploadProgress(70); // Indicate processing phase
+
+      console.log("[Client] Blob upload successful:", blob.url);
+
       const formData = new FormData();
-      formData.append("file", selectedFile);
+      formData.append("blobUrl", blob.url);
+      formData.append("fileName", selectedFile.name);
       formData.append("subject", selectedSubject);
       formData.append("uploadType", uploadType);
 
+      console.log("[Client] Sending to API...");
       const response = await fetch("/api/upload", {
         method: "POST",
         body: formData,
       });
 
+      setUploadProgress(90); // Almost done
+
+      const data = await response.json().catch(() => null);
+      
       if (!response.ok) {
-        throw new Error("Failed to upload file");
+        throw new Error(
+          data?.error || 
+          `Upload failed with status ${response.status}`
+        );
       }
 
+      setUploadProgress(100);
+      setUploadStatus("complete");
+      
+      console.log("[Client] Upload complete!", data);
       toast.success("File uploaded successfully!");
       setSelectedFile(null);
       setFilePreview(null);
 
-      // Fetch updated files list
-      const filesResponse = await fetch(
-        `/api/files?subject=${encodeURIComponent(selectedSubject)}&type=${uploadType}`
-      );
-      if (!filesResponse.ok) {
-        const error = await filesResponse.json();
-        throw new Error(error.error || 'Failed to fetch files');
+      // Refresh files list
+      if (selectedSubject) {
+        const response = await fetch(
+          `/api/files?subject=${encodeURIComponent(selectedSubject)}&type=${uploadType}`
+        );
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to fetch files');
+        }
+        const data = await response.json();
+        setFiles(data);
       }
-      const updatedFiles = await filesResponse.json();
-      setFiles(updatedFiles);
-
-      // Refresh dashboard stats
-      router.refresh();
 
     } catch (error) {
-      toast.error("Failed to upload file");
+      setUploadStatus("error");
+      console.error("[Client] Upload error:", {
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
+      toast.error(error instanceof Error ? error.message : "Upload failed");
     } finally {
       setIsUploading(false);
+      // Reset progress after a delay
+      setTimeout(() => {
+        setUploadProgress(0);
+        setUploadStatus("uploading");
+      }, 3000);
     }
   };
 
@@ -185,19 +241,17 @@ export default function NotesPage() {
     toast.info("Use the download button to view this file");
   };
 
-  const handleFileDownload = async (file: {
-    id: string;
-    name: string;
-    size: number;
-    uploadedAt: string;
-    url?: string;
-  }) => {
-    if (!file.url) return;
+  const handleDownload = async (fileUrl: string, fileName: string) => {
+    if (downloadingFiles.has(fileUrl)) {
+      toast.info("Already downloading this file");
+      return;
+    }
+
+    // Add file to downloading set
+    setDownloadingFiles(prev => new Set(prev).add(fileUrl));
 
     try {
-      toast.info("Downloading file...");
-      
-      const response = await fetch(file.url);
+      const response = await fetch(fileUrl);
       if (!response.ok) throw new Error('Download failed');
       
       const blob = await response.blob();
@@ -205,15 +259,23 @@ export default function NotesPage() {
       
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = file.name;
+      link.download = fileName;
       document.body.appendChild(link);
       link.click();
-      
       document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
+
+      toast.success('Download complete!');
     } catch (error) {
       console.error('Download error:', error);
       toast.error('Failed to download file');
+    } finally {
+      // Remove file from downloading set
+      setDownloadingFiles(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(fileUrl);
+        return newSet;
+      });
     }
   };
 
@@ -483,50 +545,104 @@ export default function NotesPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filterAndSortFiles(files).map((file) => (
-                    <Card
-                      key={file.id}
-                      className="hover:bg-accent/50 transition-colors group"
+                    <div 
+                      key={file.id} 
+                      className="group relative p-4 rounded-lg border bg-card hover:shadow-md hover:border-primary/20 transition-all duration-200"
                     >
-                      <CardContent className="p-4">
-                        <div className="flex items-start gap-4">
-                          <div className="p-2 rounded-md bg-primary/10">
-                            {getFileIcon(file.name)}
+                      {/* Download overlay */}
+                      {file.url && downloadingFiles.has(file.url) && (
+                        <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center rounded-lg z-10">
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                            <span className="text-sm font-medium text-primary">Downloading...</span>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate" title={file.name}>
-                              {file.name}
-                            </p>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-4">
+                        {/* File Icon */}
+                        <div className="shrink-0 h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="h-5 w-5 text-primary"
+                          >
+                            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                            <polyline points="14 2 14 8 20 8" />
+                          </svg>
+                        </div>
+
+                        {/* File Info */}
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-medium leading-none truncate text-foreground/90">
+                            {file.name}
+                          </h3>
+                          <div className="flex items-center gap-3 mt-1.5">
                             <p className="text-sm text-muted-foreground">
                               {formatFileSize(file.size)}
                             </p>
+                            <span className="h-1 w-1 rounded-full bg-muted-foreground/30" />
                             <p className="text-xs text-muted-foreground">
-                              {formatDate(file.uploadedAt)}
+                              {new Date().toLocaleDateString()}
                             </p>
                           </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className={cn(
-                                "sm:opacity-0 sm:group-hover:opacity-100 transition-opacity",
-                                file.isFavorite && "text-red-500"
-                              )}
-                              onClick={() => handleFavoriteToggle(file.id)}
-                            >
-                              <Heart className="h-4 w-4" fill={file.isFavorite ? "currentColor" : "none"} />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                              onClick={() => handleFileDownload(file)}
-                            >
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          </div>
                         </div>
-                      </CardContent>
-                    </Card>
+
+                        {/* Action Buttons */}
+                        <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <button
+                            onClick={() => file.url && handleDownload(file.url, file.name)}
+                            disabled={!file.url || downloadingFiles.has(file.url)}
+                            className="h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-primary/10 hover:text-primary disabled:opacity-50 transition-colors"
+                            title="Download file"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="h-4 w-4"
+                            >
+                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                              <polyline points="7 10 12 15 17 10" />
+                              <line x1="12" y1="15" x2="12" y2="3" />
+                            </svg>
+                          </button>
+
+                          <button
+                            onClick={() => handleFavoriteToggle(file.id)}
+                            className={cn(
+                              "h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-primary/10 transition-colors",
+                              file.isFavorite 
+                                ? "text-primary opacity-100" 
+                                : "hover:text-primary opacity-0 group-hover:opacity-100"
+                            )}
+                            title="Add to favorites"
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 24 24"
+                              fill={file.isFavorite ? "currentColor" : "none"}
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="h-4 w-4"
+                            >
+                              <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -534,6 +650,24 @@ export default function NotesPage() {
           </CardContent>
         </Card>
       )}
+      <div className="fixed bottom-4 right-4 flex flex-col gap-2 z-50">
+        {isUploading && selectedFile && (
+          <UploadProgress
+            fileName={selectedFile.name}
+            progress={uploadProgress}
+            status={uploadStatus}
+          />
+        )}
+        
+        {Object.entries(downloadingFiles).map(([url, { progress, status }]) => (
+          <UploadProgress
+            key={url}
+            fileName={files.find(f => f.url === url)?.name || 'File'}
+            progress={progress}
+            status={status}
+          />
+        ))}
+      </div>
     </div>
   );
 }

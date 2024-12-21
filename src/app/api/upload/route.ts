@@ -1,3 +1,4 @@
+import { del } from '@vercel/blob';
 import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "@clerk/nextjs/server";
 import { TelegramClient } from "telegram";
@@ -40,103 +41,136 @@ const CHANNEL_IDS = {
 };
 
 export async function POST(request: NextRequest) {
-  try {
-    const { userId } = getAuth(request);
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
+  const { userId: clerkId } = getAuth(request);
+  let client: TelegramClient | null = null;
 
-    // Get user from database
+  if (!clerkId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    // First get the internal user ID from Clerk ID
     const user = await prisma.user.findUnique({
-      where: { clerkId: userId },
+      where: { clerkId },
       select: { id: true }
     });
 
     if (!user) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
+      throw new Error("User not found in database");
     }
 
+    const userId = user.id; // This is the internal database ID
+
+    console.log("[Upload] Starting upload process...");
     const formData = await request.formData();
-    const file = formData.get("file") as File;
+    const blobUrl = formData.get("blobUrl") as string;
+    const fileName = formData.get("fileName") as string;
     const subject = formData.get("subject") as string;
     const uploadType = formData.get("uploadType") as string;
 
-    if (!file || !subject || !uploadType) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
+    console.log("[Upload] Received form data:", {
+      fileName,
+      subject,
+      uploadType,
+      blobUrl: blobUrl?.substring(0, 50) + "..."
+    });
+
+    if (!blobUrl || !fileName || !subject || !uploadType) {
+      throw new Error(`Missing required fields`);
     }
 
-    if (!(subject in CHANNEL_IDS) || !(uploadType in CHANNEL_IDS[subject as keyof typeof CHANNEL_IDS])) {
-      return NextResponse.json(
-        { error: "Invalid subject or upload type" },
-        { status: 400 }
-      );
+    // Download file from blob URL
+    console.log("[Upload] Downloading from blob storage...");
+    const fileResponse = await fetch(blobUrl).catch(error => {
+      throw new Error(`Failed to fetch from blob storage: ${error.message}`);
+    });
+
+    if (!fileResponse.ok) {
+      throw new Error(`Blob fetch failed with status: ${fileResponse.status}`);
     }
+    
+    const fileBuffer = Buffer.from(await fileResponse.arrayBuffer());
+    console.log("[Upload] File downloaded, size:", fileBuffer.length, "bytes");
 
-    const channelId = CHANNEL_IDS[subject as keyof typeof CHANNEL_IDS][uploadType as keyof (typeof CHANNEL_IDS)[keyof typeof CHANNEL_IDS]];
-
-    const client = new TelegramClient(
+    // Initialize Telegram client
+    console.log("[Upload] Initializing Telegram client...");
+    client = new TelegramClient(
       new StringSession(process.env.TELEGRAM_SESSION!),
       parseInt(process.env.TELEGRAM_API_ID!),
       process.env.TELEGRAM_API_HASH!,
-      { connectionRetries: 5 }
+      { 
+        connectionRetries: 5,
+        timeout: 30000
+      }
     );
 
     await client.connect();
+    console.log("[Upload] Connected to Telegram");
 
-    try {
-      // Convert File to Buffer
-      const buffer = Buffer.from(await file.arrayBuffer());
-      
-      // Create a CustomFile instance
-      const customFile = new CustomFile(
-        file.name,
-        buffer.length,
-        file.name,
-        buffer
-      );
-
-      // Upload file to Telegram
-      const result = await client.sendFile(channelId.toString(), {
-        file: customFile,
-        caption: `Uploaded by ${userId}: ${file.name}`,
-        forceDocument: true,
-      });
-
-      if (!result || !result.id) {
-        throw new Error("Failed to upload file");
-      }
-
-      // Track message ownership
-      await prisma.messageOwnership.create({
-        data: {
-          messageId: BigInt(result.id),
-          channelId: channelId,
-          userId: user.id,
-        },
-      });
-
-      return NextResponse.json({
-        success: true,
-        messageId: result.id,
-        fileName: file.name,
-      });
-    } finally {
-      await client.disconnect();
+    // Get channel ID
+    const channelId = CHANNEL_IDS[subject as keyof typeof CHANNEL_IDS]?.[uploadType as keyof (typeof CHANNEL_IDS)[keyof typeof CHANNEL_IDS]];
+    if (!channelId) {
+      throw new Error(`Invalid subject or upload type: ${subject} - ${uploadType}`);
     }
-  } catch (error) {
-    console.error("Error uploading file:", error);
-    return NextResponse.json(
-      { error: "Failed to upload file" },
-      { status: 500 }
+
+    // Create custom file for upload
+    const file = new CustomFile(
+      fileName,
+      fileBuffer.length,
+      "",
+      fileBuffer
     );
+
+    console.log("[Upload] Uploading to Telegram channel:", channelId.toString());
+    const result = await client.sendFile(channelId.toString(), {
+      file,
+      forceDocument: true,
+      caption: fileName,
+    }).catch(error => {
+      throw new Error(`Telegram upload failed: ${error.message}`);
+    });
+
+    console.log("[Upload] Telegram upload complete!");
+
+    // Save message ownership with correct userId
+    await prisma.messageOwnership.create({
+      data: {
+        messageId: BigInt(result.id),
+        channelId: channelId,
+        userId: userId, // Using internal database ID
+      },
+    });
+
+    // Delete from Blob storage
+    console.log("[Upload] Deleting from blob storage...");
+    await del(blobUrl).catch(error => {
+      console.warn("[Upload] Failed to delete blob:", error.message);
+    });
+
+    return NextResponse.json({ 
+      success: true,
+      fileUrl: `https://t.me/c/${channelId.toString().replace('-100', '')}/${result.id}`
+    });
+
+  } catch (error) {
+    console.error("[Upload] Error:", {
+      message: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : "Upload failed",
+    }, { status: 500 });
+
+  } finally {
+    if (client) {
+      try {
+        await client.disconnect();
+        console.log("[Upload] Telegram client disconnected");
+      } catch (error) {
+        console.warn("[Upload] Error disconnecting client:", error);
+      }
+    }
   }
 } 
