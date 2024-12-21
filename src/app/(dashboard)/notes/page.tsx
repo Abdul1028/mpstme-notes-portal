@@ -52,6 +52,47 @@ const CHANNEL_IDS = {
 // Max file size
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB in bytes
 
+const ALLOWED_FILE_TYPES = [
+  // Documents
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain',
+  
+  // Images
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/svg+xml',
+  
+  // Videos
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+  
+  // Audio
+  'audio/mpeg',
+  'audio/wav',
+  'audio/ogg',
+  
+  // Archives
+  'application/zip',
+  'application/x-rar-compressed',
+  'application/x-7z-compressed',
+  
+  // Code files
+  'text/javascript',
+  'application/json',
+  'text/html',
+  'text/css',
+  'text/xml',
+];
+
 export default function NotesPage() {
   const { userId } = useAuth();
   const router = useRouter();
@@ -137,8 +178,15 @@ export default function NotesPage() {
       return;
     }
 
+    // Check file size
     if (selectedFile.size > MAX_FILE_SIZE) {
       toast.error(`File size must be less than ${formatFileSize(MAX_FILE_SIZE)}`);
+      return;
+    }
+
+    // Check file type
+    if (!ALLOWED_FILE_TYPES.includes(selectedFile.type)) {
+      toast.error(`File type ${selectedFile.type || 'unknown'} is not supported`);
       return;
     }
 
