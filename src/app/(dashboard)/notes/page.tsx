@@ -7,8 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@clerk/nextjs";
-import { Loader2, FileText, Download, Search, Heart } from "lucide-react";
+import { Loader2, FileText, Download, Search, Heart, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 const CHANNEL_IDS = {
   "Advanced Java": {
@@ -45,6 +46,7 @@ const CHANNEL_IDS = {
 
 export default function NotesPage() {
   const { userId } = useAuth();
+  const router = useRouter();
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const [uploadType, setUploadType] = useState<"Main" | "Theory" | "Practical">("Main");
   const [userSubjects, setUserSubjects] = useState<string[]>([]);
@@ -154,6 +156,9 @@ export default function NotesPage() {
       }
       const updatedFiles = await filesResponse.json();
       setFiles(updatedFiles);
+
+      // Refresh dashboard stats
+      router.refresh();
 
     } catch (error) {
       toast.error("Failed to upload file");
@@ -291,19 +296,23 @@ export default function NotesPage() {
   };
 
   return (
-    <div className="space-y-6 p-3 md:p-6">
-      <Card className="shadow-lg">
+    <div className="container py-6 max-w-4xl mx-auto px-4">
+      <Card className="mb-6 shadow-lg border-t-4 border-t-primary">
         <CardHeader>
-          <CardTitle>Upload Files</CardTitle>
-          <CardDescription>Upload files to share with your classmates</CardDescription>
+          <CardTitle className="text-xl sm:text-2xl font-bold">Upload Study Materials</CardTitle>
+          <CardDescription>
+            Share your notes and materials with your classmates
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {/* Subject and Type Selection */}
+          <div className="space-y-6">
             <div className="flex flex-col sm:flex-row gap-4">
-              <Select value={selectedSubject || ""} onValueChange={setSelectedSubject}>
-                <SelectTrigger className="w-full sm:w-[200px]">
-                  <SelectValue placeholder="Select Subject" />
+              <Select 
+                onValueChange={setSelectedSubject}
+                value={selectedSubject || undefined}
+              >
+                <SelectTrigger className="w-full sm:w-[280px]">
+                  <SelectValue placeholder="Select a subject" />
                 </SelectTrigger>
                 <SelectContent>
                   {uniqueSubjects.map((subject) => (
@@ -314,9 +323,12 @@ export default function NotesPage() {
                 </SelectContent>
               </Select>
 
-              <Select value={uploadType} onValueChange={(value: "Main" | "Theory" | "Practical") => setUploadType(value)}>
-                <SelectTrigger className="w-full sm:w-[200px]">
-                  <SelectValue placeholder="Select Type" />
+              <Select 
+                value={uploadType} 
+                onValueChange={(value: "Main" | "Theory" | "Practical") => setUploadType(value)}
+              >
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Main">Main</SelectItem>
@@ -326,8 +338,7 @@ export default function NotesPage() {
               </Select>
             </div>
 
-            {/* File Upload Section */}
-            <div className="space-y-4">
+            <div className="grid gap-6">
               <div className="flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-6 cursor-pointer hover:border-primary/50 transition-colors">
                 <input
                   type="file"
@@ -341,136 +352,185 @@ export default function NotesPage() {
                 >
                   <FileText className="h-8 w-8 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground text-center">
-                    Click to upload or drag and drop
+                    {selectedFile ? selectedFile.name : "Click to upload or drag and drop"}
                   </span>
                 </label>
               </div>
+
+              {selectedFile && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <FileText className="h-5 w-5 text-primary" />
+                      <div>
+                        <p className="font-medium">{selectedFile.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatFileSize(selectedFile.size)}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleRemoveFile}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={handleFileUpload}
+                      disabled={isUploading || !selectedSubject}
+                      className="w-full sm:w-auto"
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="mr-2 h-4 w-4" />
+                          Upload File
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Files List Section */}
       {selectedSubject && (
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
               <FileText className="h-5 w-5" />
               Your Uploaded Files
             </CardTitle>
-            <CardDescription className="text-sm">
-              Files for {selectedSubject} ({uploadType})
+            <CardDescription>
+              Files you've uploaded for {selectedSubject} ({uploadType})
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Search and Filters */}
-            <div className="flex flex-col gap-4 mb-6">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search files..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
+            {isLoadingFiles ? (
+              <div className="flex justify-center items-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
               </div>
-              
-              <div className="grid grid-cols-2 sm:flex gap-2">
-                <Button
-                  variant={showFavoritesOnly ? "default" : "outline"}
-                  onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-                  className="gap-2"
-                >
-                  <Heart className="h-4 w-4" fill={showFavoritesOnly ? "currentColor" : "none"} />
-                  <span className="hidden sm:inline">{showFavoritesOnly ? "All Files" : "Favorites"}</span>
-                </Button>
-
-                <Select value={fileTypeFilter} onValueChange={setFileTypeFilter}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="document">Docs</SelectItem>
-                    <SelectItem value="image">Images</SelectItem>
-                    <SelectItem value="video">Videos</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select value={sortBy} onValueChange={(value: "name" | "date" | "size") => setSortBy(value)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Sort" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="name">Name</SelectItem>
-                    <SelectItem value="date">Date</SelectItem>
-                    <SelectItem value="size">Size</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-                >
-                  {sortOrder === "asc" ? "↑" : "↓"}
-                </Button>
+            ) : files.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                <div className="flex flex-col items-center gap-2">
+                  <FileText className="h-12 w-12 text-muted-foreground/50" />
+                  <p>No files found for this subject and type</p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search files..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant={showFavoritesOnly ? "default" : "outline"}
+                      onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                      className="gap-2"
+                    >
+                      <Heart className="h-4 w-4" fill={showFavoritesOnly ? "currentColor" : "none"} />
+                      <span className="hidden sm:inline">{showFavoritesOnly ? "All Files" : "Favorites"}</span>
+                    </Button>
+                    <Select value={fileTypeFilter} onValueChange={setFileTypeFilter}>
+                      <SelectTrigger className="w-[100px] sm:w-[130px]">
+                        <SelectValue placeholder="Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="document">Docs</SelectItem>
+                        <SelectItem value="image">Images</SelectItem>
+                        <SelectItem value="video">Videos</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={sortBy} onValueChange={(value: "name" | "date" | "size") => setSortBy(value)}>
+                      <SelectTrigger className="w-[100px] sm:w-[130px]">
+                        <SelectValue placeholder="Sort" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="name">Name</SelectItem>
+                        <SelectItem value="date">Date</SelectItem>
+                        <SelectItem value="size">Size</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                      className="w-10"
+                    >
+                      {sortOrder === "asc" ? "↑" : "↓"}
+                    </Button>
+                  </div>
+                </div>
 
-            {/* Files Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {filterAndSortFiles(files).map((file) => (
-                <Card
-                  key={file.id}
-                  className="hover:bg-accent/50 transition-colors group"
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-4">
-                      <div className="p-2 rounded-md bg-primary/10">
-                        {getFileIcon(file.name)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate" title={file.name}>
-                          {file.name}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatFileSize(file.size)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDate(file.uploadedAt)}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className={cn(
-                            "opacity-0 group-hover:opacity-100 transition-opacity",
-                            file.isFavorite && "text-red-500"
-                          )}
-                          onClick={() => handleFavoriteToggle(file.id)}
-                        >
-                          <Heart className="h-4 w-4" fill={file.isFavorite ? "currentColor" : "none"} />
-                          <span className="sr-only">
-                            {file.isFavorite ? "Remove from favorites" : "Add to favorites"}
-                          </span>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => handleFileDownload(file)}
-                        >
-                          <Download className="h-4 w-4" />
-                          <span className="sr-only">Download file</span>
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filterAndSortFiles(files).map((file) => (
+                    <Card
+                      key={file.id}
+                      className="hover:bg-accent/50 transition-colors group"
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-4">
+                          <div className="p-2 rounded-md bg-primary/10">
+                            {getFileIcon(file.name)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate" title={file.name}>
+                              {file.name}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {formatFileSize(file.size)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDate(file.uploadedAt)}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className={cn(
+                                "sm:opacity-0 sm:group-hover:opacity-100 transition-opacity",
+                                file.isFavorite && "text-red-500"
+                              )}
+                              onClick={() => handleFavoriteToggle(file.id)}
+                            >
+                              <Heart className="h-4 w-4" fill={file.isFavorite ? "currentColor" : "none"} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                              onClick={() => handleFileDownload(file)}
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
