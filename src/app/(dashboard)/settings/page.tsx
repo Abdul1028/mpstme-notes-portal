@@ -144,16 +144,16 @@ export default function SettingsPage() {
 
   return (
     <>
-      <div className="space-y-6">
+      <div className="space-y-6 p-4 md:p-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Settings</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Settings</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Manage your account settings and preferences
           </p>
         </div>
 
         <Tabs defaultValue="subjects" className="space-y-4">
-          <TabsList>
+          <TabsList className="w-full justify-start overflow-x-auto">
             <TabsTrigger value="subjects">Subjects</TabsTrigger>
             <TabsTrigger value="account">Account</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
@@ -162,13 +162,13 @@ export default function SettingsPage() {
           <TabsContent value="subjects" className="space-y-4">
             {/* Current Subjects */}
             <Card>
-              <CardHeader>
-                <CardTitle>Your Subjects</CardTitle>
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-lg sm:text-xl">Your Subjects</CardTitle>
                 <CardDescription>
                   Subjects you are currently enrolled in
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="p-4 sm:p-6 space-y-4">
                 <div className="space-y-2">
                   {isLoading ? (
                     <div className="flex items-center justify-center py-4">
@@ -182,14 +182,14 @@ export default function SettingsPage() {
                     userSubjects.map((subject, index) => (
                       <div
                         key={index}
-                        className="flex items-center justify-between rounded-md border p-2"
+                        className="flex items-center justify-between rounded-md border p-2 sm:p-3"
                       >
-                        <span>{subject}</span>
+                        <span className="text-sm sm:text-base truncate mr-2">{subject}</span>
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDeleteClick(index, subject)}
-                          className="hover:bg-destructive/10 hover:text-destructive"
+                          className="hover:bg-destructive/10 hover:text-destructive flex-shrink-0"
                         >
                           <X className="h-4 w-4" />
                         </Button>
@@ -203,14 +203,14 @@ export default function SettingsPage() {
             {/* Available Subjects */}
             {availableSubjects.length > 0 && (
               <Card>
-                <CardHeader>
-                  <CardTitle>Join New Subjects</CardTitle>
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="text-lg sm:text-xl">Join New Subjects</CardTitle>
                   <CardDescription>
                     Select additional subjects to join
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid gap-6 sm:grid-cols-2">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2">
                     {availableSubjects.map((subject) => (
                       <Card
                         key={subject.name}
@@ -220,12 +220,14 @@ export default function SettingsPage() {
                             : "hover:border-primary/50"
                         }`}
                       >
-                        <CardContent className="p-6">
-                          <div className="flex items-start gap-4">
-                            <div className="text-2xl">{subject.icon}</div>
-                            <div className="flex-1">
-                              <div className="flex items-center justify-between">
-                                <h3 className="font-semibold">{subject.name}</h3>
+                        <CardContent className="p-4 sm:p-6">
+                          <div className="flex items-start gap-3 sm:gap-4">
+                            <div className="text-xl sm:text-2xl">{subject.icon}</div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <h3 className="font-semibold text-sm sm:text-base truncate">
+                                  {subject.name}
+                                </h3>
                                 <Checkbox
                                   checked={selectedSubjects.includes(subject.name)}
                                   onCheckedChange={(checked) => {
@@ -235,9 +237,10 @@ export default function SettingsPage() {
                                         : selectedSubjects.filter((s) => s !== subject.name)
                                     );
                                   }}
+                                  className="flex-shrink-0"
                                 />
                               </div>
-                              <p className="text-sm text-muted-foreground mt-1">
+                              <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2">
                                 {subject.description}
                               </p>
                             </div>
@@ -248,7 +251,7 @@ export default function SettingsPage() {
                   </div>
 
                   {selectedSubjects.length > 0 && (
-                    <div className="mt-6 flex justify-end">
+                    <div className="mt-6">
                       <Button
                         onClick={handleJoinSubjects}
                         disabled={isJoining}
@@ -257,12 +260,12 @@ export default function SettingsPage() {
                         {isJoining ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Joining subjects...
+                            Joining...
                           </>
                         ) : (
                           <>
                             <Check className="mr-2 h-4 w-4" />
-                            Join Selected Subjects
+                            Join Selected
                           </>
                         )}
                       </Button>
@@ -275,13 +278,13 @@ export default function SettingsPage() {
 
           <TabsContent value="account">
             <Card>
-              <CardHeader>
-                <CardTitle>Account Settings</CardTitle>
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="text-lg sm:text-xl">Account Settings</CardTitle>
                 <CardDescription>
                   Update your account information
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="p-4 sm:p-6 space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Name</Label>
                   <Input id="name" placeholder="Your name" />
@@ -290,7 +293,7 @@ export default function SettingsPage() {
                   <Label htmlFor="email">Email</Label>
                   <Input id="email" type="email" placeholder="Your email" />
                 </div>
-                <Button>
+                <Button className="w-full sm:w-auto">
                   <Save className="mr-2 h-4 w-4" />
                   Save Changes
                 </Button>
