@@ -175,9 +175,6 @@
 //   }
 // } 
 
-
-
-
 //works with bigger files but a bit slow 
 // if any data isolation issues arise faalback to above code
 
