@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, BookText, Share2, Users } from "lucide-react";
-
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col">
