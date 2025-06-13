@@ -68,7 +68,8 @@ async function getAllChannels(client: TelegramClient) {
       title: c.title,
       id: c.id,
       type: c.title?.includes('-Theory') ? 'Theory' :
-            c.title?.includes('-Practical') ? 'Practical' : 'Main'
+            c.title?.includes('-Practical') ? 'Practical' :
+            c.title?.includes('-Public') ? 'Public' : 'Main'
     }))
     .sort((a, b) => a.title?.localeCompare(b.title || '') || 0);
 }
@@ -98,7 +99,8 @@ async function setupChannels() {
       const requiredChannels = [
         subject,
         `${subject}-Theory`,
-        `${subject}-Practical`
+        `${subject}-Practical`,
+        `${subject}-Public`
       ];
 
       for (const channelTitle of requiredChannels) {
@@ -138,6 +140,11 @@ async function setupChannels() {
     console.log("\nPractical Channels:");
     finalChannels
       .filter(c => c.type === 'Practical')
+      .forEach(c => console.log(`- ${c.title} (ID: ${c.id})`));
+
+    console.log("\nPublic Channels:");
+    finalChannels
+      .filter(c => c.type === 'Public')
       .forEach(c => console.log(`- ${c.title} (ID: ${c.id})`));
 
     console.log("\nTotal Channels:", finalChannels.length);
