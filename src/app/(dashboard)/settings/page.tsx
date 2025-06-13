@@ -155,8 +155,6 @@ export default function SettingsPage() {
         <Tabs defaultValue="subjects" className="space-y-4">
           <TabsList className="w-full justify-start overflow-x-auto">
             <TabsTrigger value="subjects">Subjects</TabsTrigger>
-            <TabsTrigger value="account">Account</TabsTrigger>
-            <TabsTrigger value="notifications">Notifications</TabsTrigger>
           </TabsList>
 
           <TabsContent value="subjects" className="space-y-4">
@@ -275,46 +273,7 @@ export default function SettingsPage() {
               </Card>
             )}
           </TabsContent>
-
-          <TabsContent value="account">
-            <Card>
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-lg sm:text-xl">Account Settings</CardTitle>
-                <CardDescription>
-                  Update your account information
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6 space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
-                  <Input id="name" placeholder="Your name" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" placeholder="Your email" />
-                </div>
-                <Button className="w-full sm:w-auto">
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="notifications">
-            <Card>
-              <CardHeader>
-                <CardTitle>Notification Preferences</CardTitle>
-                <CardDescription>
-                  Choose how you want to be notified
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {/* Add notification settings here */}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+        </Tabs> 
       </div>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

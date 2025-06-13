@@ -36,7 +36,7 @@ export function UploadProgress({
       </div>
       <div className="h-2 bg-muted rounded-full overflow-hidden">
         <div
-          className={cn(
+        className={cn(
             "h-full transition-all duration-300",
             status === "error" ? "bg-red-500" : "bg-primary"
           )}

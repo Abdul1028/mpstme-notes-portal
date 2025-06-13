@@ -49,7 +49,7 @@ model File {
   updatedAt DateTime @updatedAt
 
   @@index([userId, subject, type])
-}
+} 
 
 model Message {
   id        String   @id @default(cuid())

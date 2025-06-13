@@ -321,13 +321,13 @@ export default function SharedPage() {
                   <div className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center gap-3">
                       <FileText className="h-5 w-5 text-primary" />
-                      <div>
+        <div>
                         <p className="font-medium">{selectedFile.name}</p>
                         <p className="text-sm text-muted-foreground">
                           {formatFileSize(selectedFile.size)}
-                        </p>
-                      </div>
-                    </div>
+          </p>
+        </div>
+      </div>
                     <Button
                       variant="ghost"
                       size="icon"
@@ -336,7 +336,7 @@ export default function SharedPage() {
                     >
                       <X className="h-4 w-4" />
                     </Button>
-                  </div>
+      </div>
 
                   <div className="flex justify-end">
                     <Button
@@ -373,8 +373,8 @@ export default function SharedPage() {
           <CardDescription>
             Files shared by all students
           </CardDescription>
-        </CardHeader>
-        <CardContent>
+              </CardHeader>
+              <CardContent>
           {isLoadingFiles ? (
             <div className="flex justify-center items-center py-8">
               <Loader2 className="h-6 w-6 animate-spin" />
@@ -507,8 +507,8 @@ export default function SharedPage() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+              </CardContent>
+            </Card>
 
       <div className="fixed bottom-4 right-4 flex flex-col gap-2 z-50">
         {isUploading && selectedFile && (

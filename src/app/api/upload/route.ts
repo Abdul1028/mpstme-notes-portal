@@ -189,7 +189,7 @@ export async function POST(request: NextRequest) {
     );
   } finally {
     if (client) {
-      await client.disconnect();
+        await client.disconnect();
     }
   }
 }
